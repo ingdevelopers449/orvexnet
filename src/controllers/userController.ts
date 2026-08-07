@@ -449,12 +449,21 @@ export function setupUserRoutes(bot: Telegraf<any>) {
           }
       }
 
+      let keyboardButtons = [
+          [Markup.button.callback('🛍️ Seguir comprando', 'user_catalog')],
+          [Markup.button.callback('🔙 Menú principal', 'user_back')]
+      ];
+
+      if (product.tipo_entrega !== 'automatica') {
+          const supportUrl = await getSupportUrl();
+          const prefilledText = encodeURIComponent(`Hola, acabo de comprar el producto ${product.nombre} (Orden #${orderId}). Escribo para coordinar la entrega manual.`);
+          const fullSupportUrl = `${supportUrl}?text=${prefilledText}`;
+          keyboardButtons.unshift([Markup.button.url('📞 Hablar con el Vendedor', fullSupportUrl)]);
+      }
+
       await ctx.telegram.editMessageText(ctx.chat?.id, processingMsg.message_id, undefined, mensajeExito, { 
           parse_mode: 'Markdown',
-          reply_markup: Markup.inlineKeyboard([
-              [Markup.button.callback('🛍️ Seguir comprando', 'user_catalog')],
-              [Markup.button.callback('🔙 Menú principal', 'user_back')]
-          ]).reply_markup
+          reply_markup: Markup.inlineKeyboard(keyboardButtons).reply_markup
       });
 
     } catch (error) {
