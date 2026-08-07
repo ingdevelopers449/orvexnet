@@ -1,4 +1,5 @@
 import { Telegraf, Scenes, Markup, Context } from 'telegraf';
+import http from 'http';
 import { config } from './config/env';
 import { supabase } from './config/supabase';
 import LocalSession from 'telegraf-session-local';
@@ -156,3 +157,15 @@ bot.launch().then(() => {
 // Detención segura
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
+// ===============================================
+// SERVIDOR WEB FANTASMA (Para Render Web Service)
+// ===============================================
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.write('Bot is running!');
+  res.end();
+}).listen(PORT, () => {
+  console.log(`🌐 Servidor web fantasma escuchando en el puerto ${PORT}`);
+});
