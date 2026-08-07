@@ -449,7 +449,7 @@ export function setupUserRoutes(bot: Telegraf<any>) {
           }
       }
 
-      let keyboardButtons = [
+      let keyboardButtons: any[] = [
           [Markup.button.callback('🛍️ Seguir comprando', 'user_catalog')],
           [Markup.button.callback('🔙 Menú principal', 'user_back')]
       ];
