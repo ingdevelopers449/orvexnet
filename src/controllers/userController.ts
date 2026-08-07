@@ -9,6 +9,13 @@ export async function getSupportUrl() {
     return `https://t.me/${soporte}`;
 }
 
+// Helper: Obtener Saldo
+export async function getUserBalance(ctx: any) {
+    if (!ctx.from) return 0;
+    const { data } = await supabase.from('usuarios').select('saldo').eq('id_telegram', ctx.from.id).single();
+    return data ? Number(data.saldo).toFixed(2) : '0.00';
+}
+
 // Render catálogo
 export async function renderCatalogList(ctx: any, page: number = 0) {
     await ctx.sendChatAction('typing');
@@ -30,8 +37,11 @@ export async function renderCatalogList(ctx: any, page: number = 0) {
 
     const startIdx = page * itemsPerPage;
     const currentProducts = products.slice(startIdx, startIdx + itemsPerPage);
+    
+    const balance = await getUserBalance(ctx);
 
     let message = `🛍️ <b>CATÁLOGO DE PRODUCTOS</b>\n`;
+    message += `💰 <b>Tu saldo:</b> $${balance} USD\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━━\n`;
     message += `<i>Selecciona un producto para ver sus detalles:</i>\n\n`;
 
@@ -65,6 +75,7 @@ export function setupUserRoutes(bot: Telegraf<any>) {
   });
 
   bot.start(async (ctx) => {
+    const balance = await getUserBalance(ctx);
     const welcomeMessage = `✨ <b>¡BIENVENIDO A ORVEX NET!</b> ✨
 ━━━━━━━━━━━━━━━━━━━━━━━
 🚀 <i>La mejor plataforma de productos digitales.</i>
@@ -72,6 +83,8 @@ export function setupUserRoutes(bot: Telegraf<any>) {
 🔹 <b>Entregas Automáticas</b> ⚡️
 🔹 <b>Soporte Premium</b> 🛡️
 🔹 <b>Precios Insuperables</b> 💎
+
+💰 <b>Tu saldo actual:</b> $${balance} USD
 
 👇 <b>Selecciona una opción para comenzar:</b>
 ━━━━━━━━━━━━━━━━━━━━━━━`;
@@ -90,6 +103,7 @@ export function setupUserRoutes(bot: Telegraf<any>) {
 
   bot.action('user_back', async (ctx) => {
     await ctx.answerCbQuery();
+    const balance = await getUserBalance(ctx);
     const welcomeMessage = `✨ <b>¡BIENVENIDO A ORVEX NET!</b> ✨
 ━━━━━━━━━━━━━━━━━━━━━━━
 🚀 <i>La mejor plataforma de productos digitales.</i>
@@ -97,6 +111,8 @@ export function setupUserRoutes(bot: Telegraf<any>) {
 🔹 <b>Entregas Automáticas</b> ⚡️
 🔹 <b>Soporte Premium</b> 🛡️
 🔹 <b>Precios Insuperables</b> 💎
+
+💰 <b>Tu saldo actual:</b> $${balance} USD
 
 👇 <b>Selecciona una opción para comenzar:</b>
 ━━━━━━━━━━━━━━━━━━━━━━━`;
