@@ -41,12 +41,12 @@ export class NotificationService {
           if (photoUrl) {
             await this.bot.telegram.sendPhoto(user.id_telegram, photoUrl, {
               caption: messageText,
-              parse_mode: 'Markdown',
+              parse_mode: 'HTML',
               reply_markup: replyMarkup
             });
           } else {
             await this.bot.telegram.sendMessage(user.id_telegram, messageText, {
-              parse_mode: 'Markdown',
+              parse_mode: 'HTML',
               reply_markup: replyMarkup
             });
           }
@@ -76,18 +76,19 @@ export class NotificationService {
     const { data: product } = await supabase.from('productos').select('*').eq('id', productId).single();
     if (!product) return;
 
-    const message = `🆕 *NUEVO PRODUCTO*
+    const message = `<b>ORVEX SHOP</b>
+🔥 HOT!
 
-✨ ${product.nombre}
+▶️ <b>${product.nombre} NEW STOCK</b>
 
-📦 Disponible: ${product.stock} unidades
+🔥 Available: ${product.stock}
+💰 Price: From $${product.precio} USDT
 
-💰 Precio desde: $${product.precio} ${product.moneda}
-
-⚡ Compra rápida y entrega según disponibilidad.`;
+💠 Buy now:
+@${this.bot.botInfo?.username || 'ORVEXNET_BOT'}`;
 
     const markup = Markup.inlineKeyboard([
-      Markup.button.callback('🛒 Comprar ahora', `buy_product_${product.id}`)
+      Markup.button.callback('🛒 Buy Now', `buy_product_${product.id}`)
     ]).reply_markup;
 
     return this.broadcastToAll(message, markup, product.imagen_url);
@@ -97,16 +98,19 @@ export class NotificationService {
     const { data: product } = await supabase.from('productos').select('*').eq('id', productId).single();
     if (!product) return;
 
-    const message = `🔥 *¡HOT!*
+    const message = `<b>ORVEX SHOP</b>
+🔥 HOT!
 
-🌈 *${product.nombre}* NUEVO STOCK
+▶️ <b>${product.nombre} NEW STOCK</b>
 
-🔥 Disponible: ${product.stock}
+🔥 Available: ${product.stock}
+💰 Price: From $${product.precio} USDT
 
-💰 Precio: Desde $${product.precio} ${product.moneda}`;
+💠 Buy now:
+@${this.bot.botInfo?.username || 'ORVEXNET_BOT'}`;
 
     const markup = Markup.inlineKeyboard([
-      Markup.button.callback(`🌈 Comprar ${product.nombre}`, `buy_product_${product.id}`)
+      Markup.button.callback(`🛒 Buy Now`, `buy_product_${product.id}`)
     ]).reply_markup;
 
     return this.broadcastToAll(message, markup, product.imagen_url);

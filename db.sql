@@ -480,3 +480,18 @@ ALTER TABLE notificaciones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE envios_notificaciones ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE configuracion_bot ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- TABLA: INVENTARIO DINÁMICO (Cuentas individuales)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS inventario_cuentas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_producto UUID NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+    contenido TEXT NOT NULL,
+    vendido BOOLEAN NOT NULL DEFAULT FALSE,
+    id_comprador UUID REFERENCES usuarios(id) ON DELETE SET NULL,
+    fecha_agregado TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_vendido TIMESTAMPTZ
+);
+
+ALTER TABLE inventario_cuentas ENABLE ROW LEVEL SECURITY;

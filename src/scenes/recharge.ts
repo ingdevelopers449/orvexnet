@@ -2,123 +2,133 @@ import { Scenes, Markup } from 'telegraf';
 import { supabase } from '../config/supabase';
 import { BinancePayService } from '../services/binance';
 
-const cancelKeyboard = Markup.keyboard(['❌ Cancelar']).resize();
-const removeKeyboard = Markup.removeKeyboard();
 const binanceService = new BinancePayService();
+const removeKeyboard = Markup.removeKeyboard();
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const rechargeScene = new Scenes.WizardScene(
   'RECHARGE_SCENE',
-  // Paso 1: Seleccionar método
+  // Paso 1: Mostrar instrucciones directamente
   async (ctx) => {
-    await ctx.reply('💳 *Recargar Saldo*\n\nSelecciona el método de pago:', {
-        parse_mode: 'Markdown',
-        ...Markup.keyboard([['Binance Pay'], ['❌ Cancelar']]).resize()
+    // Obtener configuración de la DB
+    let payId = '372194191';
+    let binanceName = 'ORVEX_NET';
+
+    const { data: configRows } = await supabase.from('configuracion_bot').select('clave, valor').in('clave', ['binance_pay_id', 'binance_pay_name']);
+    
+    if (configRows) {
+      const payIdRow = configRows.find(r => r.clave === 'binance_pay_id');
+      const nameRow = configRows.find(r => r.clave === 'binance_pay_name');
+      if (payIdRow && payIdRow.valor) payId = payIdRow.valor;
+      if (nameRow && nameRow.valor) binanceName = nameRow.valor;
+    }
+
+    const instrucciones = `💰 *Deposito Binance Pay*
+
+*Pay ID:* \`${payId}\`
+*Nombre Binance:* \`${binanceName}\`
+
+✅ Envia el monto exacto en USDT al Pay ID de arriba.
+✅ Copia tu Binance Order ID.
+✅ Pega tu Binance Order ID aqui.
+
+⚠️ *Solo se acreditaran pagos confirmados enviados a este Binance Pay ID.*
+
+🎁 *Bonus:*
+
+$50+ ➔ +2%
+$100+ ➔ +5%
+
+*Envia tu Binance Order ID abajo:*`;
+
+    await ctx.reply(instrucciones, {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('🆔 ¿Dónde encuentro el Order ID?', 'help_order_id')],
+        [Markup.button.callback('❌ Cancelar', 'cancel_recharge')]
+      ])
     });
+
     return ctx.wizard.next();
   },
-  // Paso 2: Ingresar monto
+  // Paso 2: Recibir ID y Validar con Animación
   async (ctx) => {
+    // Manejar botón de cancelar o ayuda
     // @ts-ignore
-    if (ctx.message && 'text' in ctx.message) {
+    if (ctx.callbackQuery && 'data' in ctx.callbackQuery) {
       // @ts-ignore
-      const text = ctx.message.text;
-      if (text === '❌ Cancelar') {
+      if (ctx.callbackQuery.data === 'cancel_recharge') {
+        await ctx.answerCbQuery('Cancelado');
+        await ctx.editMessageReplyMarkup(undefined);
         await ctx.reply('Recarga cancelada.', removeKeyboard);
         return ctx.scene.leave();
       }
-      if (text !== 'Binance Pay') {
-        await ctx.reply('Por favor selecciona un método válido.');
-        return;
+      // @ts-ignore
+      if (ctx.callbackQuery.data === 'help_order_id') {
+        await ctx.answerCbQuery();
+        await ctx.reply('El Order ID es una serie de números que Binance te muestra en el recibo de tu pago exitoso (ej. 1234567890123456). Copia y pega solo los números aquí.');
+        return; // No avanzamos, nos quedamos esperando el texto
       }
-      
-      await ctx.reply('Ingresa el *monto* en USDT que deseas recargar (ej. 5.00):', {
-          parse_mode: 'Markdown',
-          ...cancelKeyboard
-      });
-      return ctx.wizard.next();
     }
-  },
-  // Paso 3: Mostrar instrucciones y pedir ID
-  async (ctx) => {
+
     // @ts-ignore
     if (ctx.message && 'text' in ctx.message) {
       // @ts-ignore
-      const text = ctx.message.text;
-      if (text === '❌ Cancelar') {
-        await ctx.reply('Recarga cancelada.', removeKeyboard);
-        return ctx.scene.leave();
-      }
+      const txId = ctx.message.text.trim();
       
-      const amount = parseFloat(text.replace(',', '.'));
-      if (isNaN(amount) || amount <= 0) {
-        await ctx.reply('⚠️ Monto inválido. Ingresa un número válido.');
-        return;
-      }
-      // @ts-ignore
-      ctx.scene.session.rechargeAmount = amount;
-
-      const instrucciones = `💰 *Instrucciones de Pago*
-
-Por favor envía exactamente *${amount.toFixed(2)} USDT* a través de Binance Pay.
-
-*Pay ID:* \`123456789\` (Reemplaza con tu Pay ID real en la configuración)
-
-Una vez realizado el pago, envíame por aquí el **ID de Transacción** (Transaction ID / Order ID) que te generó Binance.`;
-
-      await ctx.reply(instrucciones, { parse_mode: 'Markdown', ...cancelKeyboard });
-      return ctx.wizard.next();
-    }
-  },
-  // Paso 4: Validar pago
-  async (ctx) => {
-    // @ts-ignore
-    if (ctx.message && 'text' in ctx.message) {
-      // @ts-ignore
-      const text = ctx.message.text;
-      if (text === '❌ Cancelar') {
-        await ctx.reply('Recarga cancelada.', removeKeyboard);
-        return ctx.scene.leave();
-      }
+      // Animación de barra de progreso
+      const loadingMsg = await ctx.reply('⏳ Iniciando verificación...');
       
-      const txId = text.trim();
-      // @ts-ignore
-      const amount = ctx.scene.session.rechargeAmount;
-      
-      await ctx.reply('⏳ Verificando pago con Binance... Por favor espera.', removeKeyboard);
+      const frames = [
+        '⏳ Verificando pago... [■□□□□□□□□□] 10%',
+        '⏳ Conectando con Binance... [■■■□□□□□□□] 30%',
+        '⏳ Buscando transacción... [■■■■■□□□□□] 50%',
+        '⏳ Analizando montos... [■■■■■■■□□□] 75%',
+        '⏳ Finalizando validación... [■■■■■■■■■■] 100%'
+      ];
 
-      // Obtener el ID del usuario en DB
+      for (const frame of frames) {
+        await ctx.telegram.editMessageText(ctx.chat?.id, loadingMsg.message_id, undefined, frame);
+        await sleep(600); // 0.6 segundos por frame para que se vea bien
+      }
+
+      // Obtener usuario
       const { data: user } = await supabase.from('usuarios').select('id, saldo').eq('id_telegram', ctx.from?.id).single();
       
       if (!user) {
-        await ctx.reply('❌ Error: Usuario no encontrado en la base de datos.');
+        await ctx.telegram.editMessageText(ctx.chat?.id, loadingMsg.message_id, undefined, '❌ Error: Usuario no encontrado en la base de datos.');
         return ctx.scene.leave();
       }
 
-      // Validar con la API de Binance
-      const orderInfo = await binanceService.queryOrder(undefined, txId); // Suponiendo que txId es el merchantTradeNo o se busca de otra forma
+      // Validar con Binance
+      const orderInfo = await binanceService.queryOrder(undefined, txId);
       
       let isValid = false;
+      let amountPaid = 0;
       
       if (orderInfo && binanceService.isPaymentSuccessful(orderInfo)) {
-          // Extraer monto y moneda real de la orden para validar
-          const paidAmount = parseFloat(orderInfo.data.orderAmount);
+          amountPaid = parseFloat(orderInfo.data.orderAmount);
           const currency = orderInfo.data.currency;
           
-          if (paidAmount >= amount && currency === 'USDT') {
+          if (amountPaid > 0 && currency === 'USDT') {
               isValid = true;
           }
       }
 
       if (isValid) {
-        // Conversión a COP simulada (ej. 1 USDT = 4000 COP) - Esto debería ser dinámico o configurable
-        const conversionRate = 4000;
-        const amountCop = amount * conversionRate;
-        const newBalance = parseFloat(user.saldo) + amountCop;
+        // Calcular bonus
+        let bonusPercent = 0;
+        if (amountPaid >= 100) bonusPercent = 0.05;
+        else if (amountPaid >= 50) bonusPercent = 0.02;
 
-        // Insertar recarga y actualizar saldo en una transacción (RPC idealmente, aquí lo hacemos secuencial)
+        const bonusAmount = amountPaid * bonusPercent;
+        const totalUsdt = amountPaid + bonusAmount;
+        const newBalance = parseFloat(user.saldo) + totalUsdt;
+
         const { error: insertError } = await supabase.from('recargas').insert([{
             id_usuario: user.id,
-            monto: amount,
+            monto: amountPaid,
             moneda: 'USDT',
             metodo_pago: 'binance_pay',
             id_transaccion: txId,
@@ -126,11 +136,11 @@ Una vez realizado el pago, envíame por aquí el **ID de Transacción** (Transac
         }]);
 
         if (insertError) {
-             if (insertError.code === '23505') { // UNIQUE constraint violation
-                 await ctx.reply('❌ Este ID de transacción ya ha sido utilizado.');
+             if (insertError.code === '23505') { 
+                 await ctx.telegram.editMessageText(ctx.chat?.id, loadingMsg.message_id, undefined, '❌ Error: Este Order ID ya ha sido utilizado o acreditado previamente.');
                  return ctx.scene.leave();
              }
-             await ctx.reply('❌ Error interno al registrar la recarga.');
+             await ctx.telegram.editMessageText(ctx.chat?.id, loadingMsg.message_id, undefined, '❌ Error interno al registrar la recarga en la base de datos.');
              return ctx.scene.leave();
         }
 
@@ -141,19 +151,31 @@ Una vez realizado el pago, envíame por aquí el **ID de Transacción** (Transac
         await supabase.from('movimientos_saldo').insert([{
             id_usuario: user.id,
             tipo_movimiento: 'recarga',
-            monto: amountCop,
+            monto: totalUsdt,
             saldo_anterior: user.saldo,
             saldo_nuevo: newBalance,
-            descripcion: `Recarga vía Binance Pay TX: ${txId}`
+            descripcion: `Recarga Binance TX: ${txId} (+Bonus: ${bonusPercent*100}%)`
         }]);
 
-        await ctx.reply(`✅ *Recarga confirmada*\n\n💰 Monto recibido: ${amount.toFixed(2)} USDT\n💳 Método: Binance Pay\n🧾 ID de transacción: \`${txId}\`\n💰 Saldo actualizado: $${newBalance} COP\n\nGracias por tu recarga.`, { parse_mode: 'Markdown' });
+        let successMsg = `✅ *¡RECARGA CONFIRMADA EXITOSAMENTE!*\n\n`;
+        successMsg += `🧾 *Order ID:* \`${txId}\`\n`;
+        successMsg += `💰 *Monto depositado:* ${amountPaid.toFixed(2)} USD\n`;
+        
+        if (bonusPercent > 0) {
+            successMsg += `🎁 *Bonus aplicado:* +${bonusPercent*100}% (+${bonusAmount.toFixed(2)} USD)\n`;
+        }
+        
+        successMsg += `💵 *Total acreditado:* $${totalUsdt.toFixed(2)} USD\n`;
+        successMsg += `💼 *Tu nuevo saldo es:* $${newBalance.toFixed(2)} USD\n\n`;
+        successMsg += `🎉 ¡Gracias por confiar en nosotros!`;
+
+        await ctx.telegram.editMessageText(ctx.chat?.id, loadingMsg.message_id, undefined, successMsg, { parse_mode: 'Markdown' });
 
       } else {
-        // Falló la validación automática, pasa a pendiente para revisión manual
+        // Falló validación, guardar pendiente
         const { error: insertError } = await supabase.from('recargas').insert([{
             id_usuario: user.id,
-            monto: amount,
+            monto: 0, // No sabemos el monto real
             moneda: 'USDT',
             metodo_pago: 'binance_pay',
             id_transaccion: txId,
@@ -161,11 +183,11 @@ Una vez realizado el pago, envíame por aquí el **ID de Transacción** (Transac
         }]);
 
         if (insertError && insertError.code === '23505') {
-            await ctx.reply('❌ Este ID de transacción ya ha sido registrado previamente.');
+            await ctx.telegram.editMessageText(ctx.chat?.id, loadingMsg.message_id, undefined, '❌ Error: Este Order ID ya ha sido registrado previamente.');
             return ctx.scene.leave();
         }
 
-        await ctx.reply('⚠️ No pudimos verificar tu pago automáticamente en este momento o los datos no coinciden. La recarga ha quedado en estado *pendiente* y será revisada manualmente por un administrador en breve.', { parse_mode: 'Markdown' });
+        await ctx.telegram.editMessageText(ctx.chat?.id, loadingMsg.message_id, undefined, '⚠️ *Atención*\n\nNo pudimos verificar tu pago automáticamente en este momento. La recarga ha quedado en estado *pendiente*.\n\nUn administrador revisará este Order ID manualmente a la brevedad.', { parse_mode: 'Markdown' });
       }
 
       return ctx.scene.leave();

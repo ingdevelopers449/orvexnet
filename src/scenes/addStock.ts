@@ -26,10 +26,22 @@ export const addStockScene = new Scenes.WizardScene(
     // @ts-ignore
     ctx.scene.session.productData = product;
 
-    await ctx.reply(
-      `📦 Has seleccionado: *${product.nombre}*\nStock actual: ${product.stock}\n\nIngresa la cantidad de stock que deseas *agregar*:`,
-      { parse_mode: 'Markdown', ...cancelKeyboard }
-    );
+    if (product.tipo_entrega === 'automatica' && product.contenido === 'Entrega desde inventario individual') {
+        // @ts-ignore
+        ctx.scene.session.isDynamic = true;
+        await ctx.reply(
+            `📦 Has seleccionado: *${product.nombre}*\nStock actual: ${product.stock}\n\nEste es un producto de cuentas individuales. Pega o escribe aquí las credenciales que deseas agregar, *una cuenta por cada línea*.`,
+            { parse_mode: 'Markdown', ...cancelKeyboard }
+        );
+    } else {
+        // @ts-ignore
+        ctx.scene.session.isDynamic = false;
+        await ctx.reply(
+          `📦 Has seleccionado: *${product.nombre}*\nStock actual: ${product.stock}\n\nIngresa la cantidad de stock genérico que deseas *agregar* (número):`,
+          { parse_mode: 'Markdown', ...cancelKeyboard }
+        );
+    }
+    
     return ctx.wizard.next();
   },
   // Paso 2: Recibir cantidad, mostrar previa y pedir confirmación
@@ -43,10 +55,27 @@ export const addStockScene = new Scenes.WizardScene(
         return ctx.scene.leave();
       }
       
-      const cantidad = parseInt(text, 10);
-      if (isNaN(cantidad) || cantidad <= 0) {
-        await ctx.reply('⚠️ Por favor ingresa una cantidad válida mayor a 0.');
-        return;
+      // @ts-ignore
+      const isDynamic = ctx.scene.session.isDynamic;
+      let cantidad = 0;
+      let cuentas: string[] = [];
+
+      if (isDynamic) {
+          cuentas = text.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+          cantidad = cuentas.length;
+          
+          if (cantidad === 0) {
+              await ctx.reply('⚠️ No se detectó ninguna cuenta. Asegúrate de pegarlas separadas por salto de línea.');
+              return;
+          }
+          // @ts-ignore
+          ctx.scene.session.cuentasToAdd = cuentas;
+      } else {
+          cantidad = parseInt(text, 10);
+          if (isNaN(cantidad) || cantidad <= 0) {
+            await ctx.reply('⚠️ Por favor ingresa una cantidad válida mayor a 0.');
+            return;
+          }
       }
       
       // @ts-ignore
@@ -68,13 +97,16 @@ Nuevo stock: ${nuevoStock}
 
 ¿Confirmas esta actualización?`;
 
+      // Truco para quitar el teclado de sistema y luego enviar el inline
+      const tempMsg = await ctx.reply('Procesando...', removeKeyboard);
+      try { await ctx.deleteMessage(tempMsg.message_id); } catch(e) {}
+
       await ctx.reply(previewText, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.callback('✅ Confirmar y Actualizar', 'confirm_stock')],
           [Markup.button.callback('❌ Cancelar', 'cancel_stock')]
-        ]),
-        ...removeKeyboard
+        ])
       });
       
       return ctx.wizard.next();
@@ -100,8 +132,27 @@ Nuevo stock: ${nuevoStock}
         const cantidad = ctx.scene.session.stockToAdd;
         // @ts-ignore
         const nuevoStock = ctx.scene.session.nuevoStock;
+        // @ts-ignore
+        const isDynamic = ctx.scene.session.isDynamic;
+        // @ts-ignore
+        const cuentasToAdd: string[] = ctx.scene.session.cuentasToAdd || [];
         
-        // Actualizar en DB y registrar movimiento (usaremos RPC si estuviera definido, o dos inserts secuenciales)
+        // Si es inventario dinámico, insertar cada cuenta
+        if (isDynamic && cuentasToAdd.length > 0) {
+            const inserts = cuentasToAdd.map(c => ({
+                id_producto: product.id,
+                contenido: c,
+                vendido: false
+            }));
+            const { error: invErr } = await supabase.from('inventario_cuentas').insert(inserts);
+            if (invErr) {
+                console.error(invErr);
+                await ctx.reply('❌ Ocurrió un error al guardar las cuentas dinámicas en la base de datos.');
+                return ctx.scene.leave();
+            }
+        }
+
+        // Actualizar el stock total en el producto
         const { error: updateError } = await supabase
           .from('productos')
           .update({ stock: nuevoStock })
@@ -109,7 +160,7 @@ Nuevo stock: ${nuevoStock}
 
         if (updateError) {
           console.error(updateError);
-          await ctx.reply('❌ Ocurrió un error al actualizar el stock.');
+          await ctx.reply('❌ Ocurrió un error al actualizar el contador de stock.');
           return ctx.scene.leave();
         }
 

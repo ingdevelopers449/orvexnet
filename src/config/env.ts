@@ -6,7 +6,7 @@ export const config = {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
   },
   supabase: {
-    url: process.env.SUPABASE_URL || '',
+    url: (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, ''),
     serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   },
   binancePay: {

@@ -1,169 +1,154 @@
-import { Telegraf, Markup, Context, Scenes } from 'telegraf';
+import { Telegraf, Scenes, Markup, Context } from 'telegraf';
 import { config } from './config/env';
 import { supabase } from './config/supabase';
 import LocalSession from 'telegraf-session-local';
 import { addProductScene } from './scenes/addProduct';
 import { addStockScene } from './scenes/addStock';
 import { rechargeScene } from './scenes/recharge';
+import { manualRechargeScene } from './scenes/manualRecharge';
+import { searchOrderScene } from './scenes/searchOrder';
+import { editProductScene } from './scenes/editProduct';
+import { announcementScene } from './scenes/announcement';
+import { blockUserScene } from './scenes/blockUser';
 import { NotificationService } from './services/notifications';
+import { setupUserRoutes } from './controllers/userController';
+import { setupAdminRoutes } from './controllers/adminController';
 
 if (!config.telegram.botToken) {
-  throw new Error('Bot token is not provided');
+  throw new Error('BOT_TOKEN is missing in environment variables.');
 }
 
 const bot = new Telegraf(config.telegram.botToken);
 
-// Configuración de Sesiones y Escenas
-const localSession = new LocalSession({ database: 'session_db.json' });
-bot.use(localSession.middleware());
-
-const stage = new Scenes.Stage<any>([addProductScene, addStockScene, rechargeScene]);
-bot.use(stage.middleware());
-
-const notificationService = new NotificationService(bot);
-
-// Middleware para verificar si el usuario existe en DB y crearlo si no
+// Middleware para registrar usuarios automáticamente
 bot.use(async (ctx, next) => {
-  if (ctx.from) {
-    // Por rendimiento, idealmente deberíamos cachear esto, pero por ahora consultamos DB
-    const { data: user, error } = await supabase
+  if (ctx.from && !ctx.from.is_bot) {
+    const { data: user, error: selectError } = await supabase
       .from('usuarios')
       .select('id, bloqueado')
       .eq('id_telegram', ctx.from.id)
       .single();
 
-    if (error && error.code === 'PGRST116') {
-      // No existe, crearlo
-      await supabase.from('usuarios').insert([
+    if (selectError && selectError.code === 'PGRST116') {
+      const { error: insertError } = await supabase.from('usuarios').insert([
         {
           id_telegram: ctx.from.id,
           nombre: ctx.from.first_name || '',
           nombre_usuario: ctx.from.username || null,
         }
       ]);
+      if (insertError) {
+        console.error('Error al insertar usuario:', insertError);
+      }
     } else if (user && user.bloqueado) {
-      // Si está bloqueado, no lo procesamos
-      return;
+      // Bloquear cualquier comando si el usuario está baneado
+      if (ctx.message || ctx.callbackQuery) {
+          try {
+             await ctx.reply('⛔ Tu cuenta ha sido bloqueada por un administrador.');
+          } catch(e) {}
+      }
+      return; // Detener flujo
     }
   }
   return next();
 });
 
-// Middleware de administrador
-const adminMiddleware = async (ctx: Context, next: () => Promise<void>) => {
-  if (!ctx.from) return;
-  const { data: admin } = await supabase
-    .from('administradores')
-    .select('id')
-    .eq('id_telegram', ctx.from.id)
-    .eq('activo', true)
-    .single();
+// Middleware de Membresía Obligatoria
+bot.use(async (ctx, next) => {
+  if (!ctx.from || ctx.from.is_bot) return next();
 
-  if (admin) {
+  try {
+    const { data: configRow } = await supabase.from('configuracion_bot').select('valor').eq('clave', 'canal_telegram').single();
+    const canal = configRow?.valor;
+
+    if (!canal) return next();
+
+    const channelId = canal.startsWith('@') ? canal : `@${canal}`;
+    const member = await ctx.telegram.getChatMember(channelId, ctx.from.id);
+    const isMember = ['member', 'administrator', 'creator'].includes(member.status);
+    
+    // @ts-ignore
+    const cbData = ctx.callbackQuery?.data;
+
+    if (isMember) {
+      if (cbData === 'check_membership') {
+        await ctx.answerCbQuery('✅ ¡Gracias por unirte! Ya puedes usar el bot.');
+        await ctx.deleteMessage().catch(() => {});
+        // Enviar un start simulado
+        const supportUrl = 'Soporte'; // Dummy or we can just send text
+        await ctx.reply('✅ Gracias por unirte. Escribe /start para ver el menú principal.');
+        return;
+      }
+      return next();
+    } else {
+      if (cbData === 'check_membership') {
+         await ctx.answerCbQuery('❌ Aún no te has unido al canal. Revisa bien.', { show_alert: true });
+         return; 
+      }
+
+      const link = `https://t.me/${channelId.replace('@', '')}`;
+      const msg = `📢 <b>¡Atención!</b>\n\nPara poder utilizar este bot, es <b>obligatorio</b> que te unas a nuestro canal oficial.\n\nÚnete tocando el botón de abajo y luego presiona "✅ Ya me uní".`;
+      
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.url('🔗 Unirse al Canal', link)],
+        [Markup.button.callback('✅ Ya me uní', 'check_membership')]
+      ]);
+
+      if (ctx.callbackQuery) {
+        await ctx.answerCbQuery().catch(() => {});
+        await ctx.editMessageText(msg, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
+      } else {
+        await ctx.reply(msg, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
+      }
+      return; 
+    }
+  } catch (e) {
+    console.error('Error al verificar canal:', e);
     return next();
   }
-  // No hacemos nada si no es admin (según instrucciones)
-};
-
-// Comando /admin
-bot.command('admin', adminMiddleware, async (ctx) => {
-  await ctx.reply(
-    '⚙️ Panel de administración principal\n\nSeleccione una opción:',
-    Markup.inlineKeyboard([
-      [Markup.button.callback('➕ Agregar producto', 'admin_add_product'), Markup.button.callback('📦 Agregar nuevo stock', 'admin_add_stock')],
-      [Markup.button.callback('✏️ Editar producto', 'admin_edit_product'), Markup.button.callback('💰 Cambiar precio', 'admin_change_price')],
-      [Markup.button.callback('📝 Cambiar descripción', 'admin_change_desc')],
-      [Markup.button.callback('🟢 Activar producto', 'admin_activate_prod'), Markup.button.callback('🔴 Desactivar producto', 'admin_deactivate_prod')],
-      [Markup.button.callback('🗑️ Eliminar producto', 'admin_delete_prod'), Markup.button.callback('📊 Ver inventario', 'admin_view_inventory')],
-      [Markup.button.callback('📢 Enviar anuncio', 'admin_send_announcement'), Markup.button.callback('👥 Ver usuarios', 'admin_view_users')],
-      [Markup.button.callback('💳 Revisar recargas', 'admin_review_recharges'), Markup.button.callback('💰 Gestionar saldos', 'admin_manage_balances')],
-      [Markup.button.callback('🧾 Ver compras', 'admin_view_purchases'), Markup.button.callback('📈 Ver estadísticas', 'admin_view_stats')],
-      [Markup.button.callback('🚫 Bloquear usuario', 'admin_block_user')],
-      [Markup.button.callback('🔙 Volver al inicio', 'admin_back')]
-    ])
-  );
 });
 
-// Manejadores temporales de callback para probar el panel
-bot.action('admin_back', adminMiddleware, async (ctx) => {
-  await ctx.answerCbQuery();
-  await ctx.editMessageText('Panel cerrado.');
+// Configuración de Sesiones y Escenas
+const localSession = new LocalSession({ database: 'session_db.json' });
+bot.use(localSession.middleware());
+
+// El stage central (Añadiremos ANNOUNCEMENT_SCENE y BLOCK_USER_SCENE después)
+const stage = new Scenes.Stage<any>([
+  addProductScene, 
+  addStockScene, 
+  rechargeScene, 
+  manualRechargeScene, 
+  searchOrderScene, 
+  editProductScene,
+  announcementScene,
+  blockUserScene
+]);
+
+// Sistema de escape global
+stage.command('cancelar', async (ctx) => {
+  await ctx.scene.leave();
+  await ctx.reply('❌ Acción cancelada.', Markup.removeKeyboard());
+});
+stage.command('start', async (ctx, next) => {
+  await ctx.scene.leave();
+  return next();
 });
 
-bot.action('admin_add_product', adminMiddleware, async (ctx) => {
-  await ctx.answerCbQuery();
-  // @ts-ignore
-  await ctx.scene.enter('ADD_PRODUCT_SCENE');
-});
+bot.use(stage.middleware());
 
-bot.action('admin_add_stock', adminMiddleware, async (ctx) => {
-  await ctx.answerCbQuery('Cargando productos...');
-  const { data: products } = await supabase.from('productos').select('id, nombre').eq('activo', true);
-  
-  if (!products || products.length === 0) {
-    return ctx.editMessageText('No hay productos activos para agregar stock.', Markup.inlineKeyboard([
-      [Markup.button.callback('🔙 Volver', 'admin_back')]
-    ]));
-  }
+const notificationService = new NotificationService(bot);
 
-  const buttons = products.map(p => [Markup.button.callback(p.nombre, `select_stock_prod_${p.id}`)]);
-  buttons.push([Markup.button.callback('🔙 Volver', 'admin_back')]);
-  
-  await ctx.editMessageText('📦 Selecciona el producto al que deseas agregar stock:', Markup.inlineKeyboard(buttons));
-});
+// ===============================================
+// INICIALIZACIÓN DE CONTROLADORES (MVC)
+// ===============================================
+setupAdminRoutes(bot, notificationService);
+setupUserRoutes(bot);
 
-bot.action(/select_stock_prod_(.+)/, adminMiddleware, async (ctx) => {
-  const productId = ctx.match[1];
-  await ctx.answerCbQuery();
-  // @ts-ignore
-  ctx.scene.session.selectedProductId = productId;
-  // @ts-ignore
-  await ctx.scene.enter('ADD_STOCK_SCENE');
-});
-
-bot.action(/publish_never|publish_later|notify_none/, adminMiddleware, async (ctx) => {
-  await ctx.answerCbQuery();
-  await ctx.editMessageText('Entendido, no se ha enviado ninguna notificación.');
-});
-
-bot.action(/publish_([a-z0-9\-]+)/, adminMiddleware, async (ctx) => {
-  if (ctx.match[1] === 'never' || ctx.match[1] === 'later') return; // Handled above
-  const productId = ctx.match[1];
-  await ctx.answerCbQuery('Enviando notificaciones...');
-  await ctx.editMessageText('Enviando notificaciones en segundo plano...');
-  const result = await notificationService.sendNewProductNotification(productId);
-  if (result) {
-    await ctx.reply(`✅ Notificación enviada. Éxito: ${result.successCount}, Fallos: ${result.failCount}`);
-  }
-});
-
-bot.action(/notify_stock_([a-z0-9\-]+)/, adminMiddleware, async (ctx) => {
-  const productId = ctx.match[1];
-  await ctx.answerCbQuery('Enviando notificaciones...');
-  await ctx.editMessageText('Enviando notificaciones en segundo plano...');
-  const result = await notificationService.sendNewStockNotification(productId);
-  if (result) {
-    await ctx.reply(`✅ Notificación de stock enviada. Éxito: ${result.successCount}, Fallos: ${result.failCount}`);
-  }
-});
-
-bot.action(/admin_.+/, adminMiddleware, async (ctx) => {
-  await ctx.answerCbQuery('Esta función aún no está implementada.');
-});
-
-// Comando de usuario para recargar
-bot.command('recargar', async (ctx) => {
-  // @ts-ignore
-  await ctx.scene.enter('RECHARGE_SCENE');
-});
-
-bot.start(async (ctx) => {
-  await ctx.reply('¡Bienvenido! Usa /admin si eres administrador o /recargar para añadir saldo.');
-});
-
-// Inicio del bot
+// ===============================================
+// INICIO DEL BOT
+// ===============================================
 bot.launch().then(() => {
-  console.log('🤖 Bot iniciado correctamente.');
+  console.log('🤖 Bot iniciado correctamente con arquitectura MVC.');
 }).catch((err) => {
   console.error('Error al iniciar el bot:', err);
 });
