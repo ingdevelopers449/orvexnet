@@ -424,7 +424,7 @@ export function setupUserRoutes(bot: Telegraf<any>) {
 
           // --- NOTIFICAR A LOS ADMINS SOBRE LA COMPRA MANUAL ---
           try {
-              const { data: admins } = await supabase.from('usuarios').select('id_telegram').eq('rol', 'admin');
+              const { data: admins } = await supabase.from('administradores').select('id_telegram').eq('activo', true);
               if (admins && admins.length > 0) {
                   const username = ctx.from?.username ? `@${ctx.from.username}` : `Sin @ (Nombre: ${ctx.from?.first_name})`;
                   const userId = ctx.from?.id;
