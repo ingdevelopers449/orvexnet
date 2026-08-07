@@ -421,6 +421,32 @@ export function setupUserRoutes(bot: Telegraf<any>) {
       } else {
           mensajeExito += `⏳ *Entrega Manual:* Un administrador ha sido notificado y se comunicará contigo en breve para entregarte los productos.\n\n`;
           mensajeExito += `¡Gracias por tu compra!`;
+
+          // --- NOTIFICAR A LOS ADMINS SOBRE LA COMPRA MANUAL ---
+          try {
+              const { data: admins } = await supabase.from('usuarios').select('id_telegram').eq('rol', 'admin');
+              if (admins && admins.length > 0) {
+                  const username = ctx.from?.username ? `@${ctx.from.username}` : `Sin @ (Nombre: ${ctx.from?.first_name})`;
+                  const userId = ctx.from?.id;
+                  const adminMsg = `🚨 <b>NUEVA VENTA (ENTREGA MANUAL)</b> 🚨
+━━━━━━━━━━━━━━━━━━━━━━━
+🛍️ <b>Producto:</b> ${product.nombre} (x${qty})
+💰 <b>Total pagado:</b> $${totalPrice.toFixed(2)} USD
+🧾 <b>ID Orden:</b> #${orderId}
+
+👤 <b>Cliente:</b> ${username}
+🆔 <b>ID Telegram:</b> <code>${userId}</code>
+🔗 <b>Enlace Directo:</b> <a href="tg://user?id=${userId}">Toca aquí para chatear con el cliente</a>
+
+⚠️ <i>Contacta al cliente para hacerle la entrega manual.</i>`;
+
+                  for (const admin of admins) {
+                      await ctx.telegram.sendMessage(admin.id_telegram, adminMsg, { parse_mode: 'HTML' }).catch(() => {});
+                  }
+              }
+          } catch (err) {
+              console.error('Error enviando alerta a admins:', err);
+          }
       }
 
       await ctx.telegram.editMessageText(ctx.chat?.id, processingMsg.message_id, undefined, mensajeExito, { 
