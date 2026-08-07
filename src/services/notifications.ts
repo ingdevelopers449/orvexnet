@@ -69,26 +69,47 @@ export class NotificationService {
       }
     }
 
+    // 3. Enviar también al Canal Oficial (si está configurado)
+    try {
+      const { data: configRow } = await supabase.from('configuracion_bot').select('valor').eq('clave', 'canal_telegram').single();
+      const canal = configRow?.valor;
+      if (canal) {
+        const channelId = canal.startsWith('@') ? canal : `@${canal}`;
+        // Enviar sin botones al canal para evitar errores de edición de mensaje público
+        if (photoUrl) {
+           await this.bot.telegram.sendPhoto(channelId, photoUrl, { caption: messageText, parse_mode: 'HTML' });
+        } else {
+           await this.bot.telegram.sendMessage(channelId, messageText, { parse_mode: 'HTML' });
+        }
+      }
+    } catch (e) {
+      console.error('Error enviando notificación al canal:', e);
+    }
+
     return { successCount, failCount };
+  }
+
+  // Genera el diseño premium idéntico al solicitado
+  private formatPremiumMessage(product: any) {
+      return `🔥 HOT!
+
+✨ <b>${product.nombre} NEW STOCK</b>
+
+🔥 Available: ${product.stock}
+💸 Price: From $${product.precio} USDT
+
+❖ Buy now:
+@${this.bot.botInfo?.username || 'ORVEXNET_BOT'}`;
   }
 
   async sendNewProductNotification(productId: string) {
     const { data: product } = await supabase.from('productos').select('*').eq('id', productId).single();
     if (!product) return;
 
-    const message = `<b>ORVEX SHOP</b>
-🔥 HOT!
-
-▶️ <b>${product.nombre} NEW STOCK</b>
-
-🔥 Available: ${product.stock}
-💰 Price: From $${product.precio} USDT
-
-💠 Buy now:
-@${this.bot.botInfo?.username || 'ORVEXNET_BOT'}`;
+    const message = this.formatPremiumMessage(product);
 
     const markup = Markup.inlineKeyboard([
-      Markup.button.callback('🛒 Buy Now', `buy_product_${product.id}`)
+      Markup.button.callback('🛒 Buy Now', `view_product_${product.id}`)
     ]).reply_markup;
 
     return this.broadcastToAll(message, markup, product.imagen_url);
@@ -98,19 +119,10 @@ export class NotificationService {
     const { data: product } = await supabase.from('productos').select('*').eq('id', productId).single();
     if (!product) return;
 
-    const message = `<b>ORVEX SHOP</b>
-🔥 HOT!
-
-▶️ <b>${product.nombre} NEW STOCK</b>
-
-🔥 Available: ${product.stock}
-💰 Price: From $${product.precio} USDT
-
-💠 Buy now:
-@${this.bot.botInfo?.username || 'ORVEXNET_BOT'}`;
+    const message = this.formatPremiumMessage(product);
 
     const markup = Markup.inlineKeyboard([
-      Markup.button.callback(`🛒 Buy Now`, `buy_product_${product.id}`)
+      Markup.button.callback(`🛒 Buy Now`, `view_product_${product.id}`)
     ]).reply_markup;
 
     return this.broadcastToAll(message, markup, product.imagen_url);
