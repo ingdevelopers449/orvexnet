@@ -1,5 +1,6 @@
 import { Telegraf, Markup, Context } from 'telegraf';
 import { supabase } from '../config/supabase';
+import { t } from '../locales/i18n';
 
 // Helper: Soporte URL
 export async function getSupportUrl() {
@@ -24,8 +25,8 @@ export async function renderCatalogList(ctx: any, page: number = 0) {
     if (error) console.error('Error fetching products:', error);
 
     if (!products || products.length === 0) {
-        return ctx.editMessageText('😔 Lo sentimos, no hay productos disponibles en este momento.', Markup.inlineKeyboard([
-            [Markup.button.callback('🔙 Volver al menú', 'user_back')]
+        return ctx.editMessageText(t(ctx, 'empty_catalog'), Markup.inlineKeyboard([
+            [Markup.button.callback(t(ctx, 'btn_back_menu'), 'user_back')]
         ]));
     }
 
@@ -40,15 +41,15 @@ export async function renderCatalogList(ctx: any, page: number = 0) {
     
     const balance = await getUserBalance(ctx);
 
-    let message = `🛍️ <b>CATÁLOGO DE PRODUCTOS</b>\n`;
-    message += `💰 <b>Tu saldo:</b> $${balance} USD\n`;
+    let message = `${t(ctx, 'catalog_title')}\n`;
+    message += `${t(ctx, 'balance_label')} $${balance} USD\n`;
     message += `━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    message += `<i>Selecciona un producto para ver sus detalles:</i>\n\n`;
+    message += `${t(ctx, 'catalog_desc')}\n\n`;
 
     const buttons = [];
 
     for (const p of currentProducts) {
-        buttons.push([Markup.button.callback(`💎 ${p.nombre} - $${p.precio} USD | 📦 Stock: ${p.stock}`, `view_product_${p.id}`)]);
+        buttons.push([Markup.button.callback(`💎 ${p.nombre} - $${p.precio} USD | ${t(ctx, 'stock_label')}: ${p.stock}`, `view_product_${p.id}`)]);
     }
 
     if (totalPages > 1) {
@@ -59,7 +60,7 @@ export async function renderCatalogList(ctx: any, page: number = 0) {
         ]);
     }
 
-    buttons.push([Markup.button.callback('🔙 Menú Principal', 'user_back')]);
+    buttons.push([Markup.button.callback(t(ctx, 'btn_back_menu'), 'user_back')]);
 
     try {
         await ctx.editMessageText(message, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
@@ -75,54 +76,78 @@ export function setupUserRoutes(bot: Telegraf<any>) {
   });
 
   bot.start(async (ctx) => {
+    if (!ctx.session) ctx.session = {};
+    if (!ctx.session.language) {
+        // Mostrar menú de idioma
+        const langKeyboard = Markup.inlineKeyboard([
+            [Markup.button.callback('🇪🇸 Español', 'set_lang_es')],
+            [Markup.button.callback('🇺🇸 English', 'set_lang_en')]
+        ]);
+        return ctx.reply('🌍 Please select your language / Por favor selecciona tu idioma:', langKeyboard);
+    }
+    await sendMainMenu(ctx);
+  });
+
+  bot.action('set_lang_es', async (ctx) => {
+      if (!ctx.session) ctx.session = {};
+      ctx.session.language = 'es';
+      await ctx.deleteMessage().catch(() => {});
+      await sendMainMenu(ctx);
+  });
+
+  bot.action('set_lang_en', async (ctx) => {
+      if (!ctx.session) ctx.session = {};
+      ctx.session.language = 'en';
+      await ctx.deleteMessage().catch(() => {});
+      await sendMainMenu(ctx);
+  });
+
+  async function sendMainMenu(ctx: any) {
     const balance = await getUserBalance(ctx);
-    const welcomeMessage = `✨ <b>¡BIENVENIDO A ORVEX NET!</b> ✨
+    const welcomeMessage = `${t(ctx, 'welcome_title')}
 ━━━━━━━━━━━━━━━━━━━━━━━
-🚀 <i>La mejor plataforma de productos digitales.</i>
+${t(ctx, 'welcome_desc')}
 
-🔹 <b>Entregas Automáticas</b> ⚡️
-🔹 <b>Soporte Premium</b> 🛡️
-🔹 <b>Precios Insuperables</b> 💎
+${t(ctx, 'balance_label')} $${balance} USD
 
-💰 <b>Tu saldo actual:</b> $${balance} USD
-
-👇 <b>Selecciona una opción para comenzar:</b>
+${t(ctx, 'select_option')}
 ━━━━━━━━━━━━━━━━━━━━━━━`;
 
     const supportUrl = await getSupportUrl();
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('🛒 VER CATÁLOGO DE PRODUCTOS', 'user_catalog')],
-      [Markup.button.callback('💳 Recargar Saldo', 'user_recharge'), Markup.button.callback('👤 Mi Perfil', 'user_profile')],
-      [Markup.button.url('📞 Contactar a Soporte', supportUrl)]
+      [Markup.button.callback(t(ctx, 'btn_catalog'), 'user_catalog')],
+      [Markup.button.callback(t(ctx, 'btn_recharge'), 'user_recharge'), Markup.button.callback(t(ctx, 'btn_profile'), 'user_profile')],
+      [Markup.button.url(t(ctx, 'btn_support'), supportUrl)]
     ]);
 
-    await ctx.reply('🔥');
-    await ctx.reply(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
-  });
+    try {
+        await ctx.reply('🔥');
+        await ctx.reply(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
+    } catch (e) {
+        await ctx.reply(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
+    }
+  }
 
   bot.action('user_back', async (ctx) => {
     await ctx.answerCbQuery();
     const balance = await getUserBalance(ctx);
-    const welcomeMessage = `✨ <b>¡BIENVENIDO A ORVEX NET!</b> ✨
+    const welcomeMessage = `${t(ctx, 'welcome_title')}
 ━━━━━━━━━━━━━━━━━━━━━━━
-🚀 <i>La mejor plataforma de productos digitales.</i>
+${t(ctx, 'welcome_desc')}
 
-🔹 <b>Entregas Automáticas</b> ⚡️
-🔹 <b>Soporte Premium</b> 🛡️
-🔹 <b>Precios Insuperables</b> 💎
+${t(ctx, 'balance_label')} $${balance} USD
 
-💰 <b>Tu saldo actual:</b> $${balance} USD
-
-👇 <b>Selecciona una opción para comenzar:</b>
+${t(ctx, 'select_option')}
 ━━━━━━━━━━━━━━━━━━━━━━━`;
     const supportUrl = await getSupportUrl();
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('🛒 VER CATÁLOGO DE PRODUCTOS', 'user_catalog')],
-      [Markup.button.callback('💳 Recargar Saldo', 'user_recharge'), Markup.button.callback('👤 Mi Perfil', 'user_profile')],
-      [Markup.button.url('📞 Contactar a Soporte', supportUrl)]
+      [Markup.button.callback(t(ctx, 'btn_catalog'), 'user_catalog')],
+      [Markup.button.callback(t(ctx, 'btn_recharge'), 'user_recharge'), Markup.button.callback(t(ctx, 'btn_profile'), 'user_profile')],
+      [Markup.button.url(t(ctx, 'btn_support'), supportUrl)]
     ]);
-    await ctx.editMessageText(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
+
+    await ctx.editMessageText(welcomeMessage, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
   });
 
   bot.action('user_catalog', async (ctx) => {
@@ -140,7 +165,7 @@ export function setupUserRoutes(bot: Telegraf<any>) {
       const productId = ctx.match[1];
       await ctx.answerCbQuery();
       const { data: product } = await supabase.from('productos').select('*').eq('id', productId).single();
-      if (!product) return ctx.reply('Error: Producto no encontrado');
+      if (!product) return ctx.reply(t(ctx, 'err_product_not_found'));
 
       const message = `🛍️ <b>DETALLES DEL PRODUCTO</b>
 ━━━━━━━━━━━━━━━━━━━━━━━
@@ -148,13 +173,13 @@ export function setupUserRoutes(bot: Telegraf<any>) {
 
 📜 <i>${product.descripcion || 'Sin descripción detallada.'}</i>
 
-📦 <b>Stock Disponible:</b> ${product.stock}
-💰 <b>Precio:</b> $${product.precio} USD
+${t(ctx, 'available_stock')} ${product.stock}
+${t(ctx, 'unit_price')} $${product.precio} USD
 ━━━━━━━━━━━━━━━━━━━━━━━`;
 
       const buttons = [
           [Markup.button.callback(`🛒 Seleccionar cantidad`, `checkout_${product.id}_1`)],
-          [Markup.button.callback('🔙 Volver al catálogo', 'user_catalog')]
+          [Markup.button.callback(t(ctx, 'btn_back_catalog'), 'user_catalog')]
       ];
 
       try {
@@ -176,9 +201,9 @@ export function setupUserRoutes(bot: Telegraf<any>) {
     const saldo = user.saldo;
     const { count } = await supabase.from('compras').select('*', { count: 'exact', head: true }).eq('id_usuario', user.id);
 
-    const profileText = `👤 <b>TU PERFIL DE USUARIO</b>
+    const profileText = `${t(ctx, 'profile_title')}
 ━━━━━━━━━━━━━━━━━━━━━━━
-🆔 <b>ID de Telegram:</b> <code>${ctx.from?.id}</code>
+${t(ctx, 'profile_id')} <code>${ctx.from?.id}</code>
 📅 <b>Usuario desde:</b> ${new Date(user.fecha_registro).toLocaleDateString()}
 🛍️ <b>Compras realizadas:</b> ${count || 0}
 
@@ -190,9 +215,9 @@ export function setupUserRoutes(bot: Telegraf<any>) {
     await ctx.editMessageText(profileText, {
       parse_mode: 'HTML',
       ...Markup.inlineKeyboard([
-          [Markup.button.callback('💳 Recargar Saldo', 'user_recharge')],
-          [Markup.button.callback('🧾 Mi Historial', 'user_history')],
-          [Markup.button.callback('🔙 Volver al menú', 'user_back')]
+          [Markup.button.callback(t(ctx, 'btn_recharge'), 'user_recharge')],
+          [Markup.button.callback(t(ctx, 'btn_history'), 'user_history')],
+          [Markup.button.callback(t(ctx, 'btn_back_menu'), 'user_back')]
       ])
     });
   });
@@ -204,23 +229,23 @@ export function setupUserRoutes(bot: Telegraf<any>) {
       const { data: compras } = await supabase.from('compras').select('id_producto').eq('id_usuario', user.id);
       
       if (!compras || compras.length === 0) {
-          return ctx.editMessageText('🧾 <b>Historial de Compras</b>\n\nAún no has realizado ninguna compra.', {
+          return ctx.editMessageText(t(ctx, 'history_empty'), {
               parse_mode: 'HTML',
-              ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al Perfil', 'user_profile')]])
+              ...Markup.inlineKeyboard([[Markup.button.callback(t(ctx, 'btn_back_history') || '🔙 Volver', 'user_profile')]])
           });
       }
 
       const uniqueProductIds = [...new Set(compras.map(c => c.id_producto))];
       const { data: products } = await supabase.from('productos').select('id, nombre').in('id', uniqueProductIds);
 
-      let message = `🧾 <b>TU HISTORIAL DE COMPRAS</b>\n━━━━━━━━━━━━━━━━━━━━━━━\n<i>Selecciona el producto del cual quieres ver los detalles:</i>\n\n`;
+      let message = `${t(ctx, 'history_title')}\n━━━━━━━━━━━━━━━━━━━━━━━\n${t(ctx, 'history_desc')}\n\n`;
       const buttons = [];
       if (products) {
           for (const p of products) {
               buttons.push([Markup.button.callback(`📦 ${p.nombre}`, `history_prod_${p.id}`)]);
           }
       }
-      buttons.push([Markup.button.callback('🔙 Volver al Perfil', 'user_profile')]);
+      buttons.push([Markup.button.callback(t(ctx, 'btn_back_menu'), 'user_profile')]);
 
       try {
           await ctx.editMessageText(message, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
@@ -237,11 +262,11 @@ export function setupUserRoutes(bot: Telegraf<any>) {
       const { data: compras } = await supabase.from('compras').select('*').eq('id_usuario', user.id).eq('id_producto', productId).order('fecha_compra', { ascending: false });
       const { data: cuentas } = await supabase.from('inventario_cuentas').select('*').eq('id_comprador', user.id).eq('id_producto', productId).order('fecha_vendido', { ascending: false });
 
-      let message = `🧾 <b>HISTORIAL: ${product.nombre}</b>\n━━━━━━━━━━━━━━━━━━━━━━━\n`;
-      message += `🛍️ <b>Transacciones realizadas:</b> ${compras ? compras.length : 0}\n\n`;
+      let message = `${t(ctx, 'history_item_title').replace('{productName}', product.nombre)}\n━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      message += `${t(ctx, 'history_tx_count')} ${compras ? compras.length : 0}\n\n`;
 
       if (compras && compras.length > 0) {
-          message += `📋 <b>Tus Órdenes:</b>\n`;
+          message += `${t(ctx, 'history_orders')}\n`;
           for (const c of compras) {
               const date = new Date(c.fecha_compra).toLocaleDateString();
               const orderId = c.id.substring(0, 8).toUpperCase();
@@ -251,15 +276,15 @@ export function setupUserRoutes(bot: Telegraf<any>) {
       }
 
       if (cuentas && cuentas.length > 0) {
-          message += `🎁 <b>Cuentas / Items Entregados:</b>\n\n`;
+          message += `${t(ctx, 'history_accounts')}\n\n`;
           for (let i = 0; i < cuentas.length; i++) {
               const fecha = new Date(cuentas[i].fecha_vendido).toLocaleDateString();
               message += `[${fecha}]\n<code>${cuentas[i].contenido}</code>\n\n`;
           }
       } else if (product.tipo_entrega === 'automatica' && product.contenido !== 'Entrega desde inventario individual') {
-          message += `🎁 <b>Contenido Entregado:</b>\n<code>${product.contenido}</code>\n\n`;
+          message += `${t(ctx, 'history_content')}\n<code>${product.contenido}</code>\n\n`;
       } else {
-          message += `⏳ <b>Tipo de entrega:</b> Manual (soporte).\n\n`;
+          message += `${t(ctx, 'history_manual')}\n\n`;
       }
 
       if (message.length > 4000) {
@@ -267,7 +292,7 @@ export function setupUserRoutes(bot: Telegraf<any>) {
       }
 
       try {
-          await ctx.editMessageText(message, { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al Historial general', 'user_history')]]) });
+          await ctx.editMessageText(message, { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback(t(ctx, 'btn_back_history'), 'user_history')]]) });
       } catch (e) {}
   });
 
@@ -277,25 +302,25 @@ export function setupUserRoutes(bot: Telegraf<any>) {
       await ctx.answerCbQuery();
       
       const { data: product } = await supabase.from('productos').select('*').eq('id', productId).single();
-      if (!product) return ctx.reply('Error: Producto no encontrado');
-      if (!product.activo) return ctx.editMessageText('❌ Este producto ya no está activo.', { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al catálogo', 'user_catalog')]])});
-      if (product.stock <= 0) return ctx.editMessageText('❌ Agotado. No hay stock disponible.', { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al catálogo', 'user_catalog')]])});
+      if (!product) return ctx.reply(t(ctx, 'err_product_not_found'));
+      if (!product.activo) return ctx.editMessageText(t(ctx, 'err_product_inactive'), { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback(t(ctx, 'btn_back_catalog'), 'user_catalog')]])});
+      if (product.stock <= 0) return ctx.editMessageText(t(ctx, 'err_out_of_stock'), { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback(t(ctx, 'btn_back_catalog'), 'user_catalog')]])});
 
       if (qty < 1) qty = 1;
       if (qty > product.stock) qty = product.stock;
 
       const totalAmount = product.precio * qty;
-      const checkoutMsg = `🛒 <b>PANTALLA DE COMPRA</b>
+      const checkoutMsg = `${t(ctx, 'checkout_title')}
 ━━━━━━━━━━━━━━━━━━━━━━━
 💎 <b>${product.nombre}</b>
 
-💰 <b>Precio unitario:</b> $${product.precio} USD
-📦 <b>Stock disponible:</b> ${product.stock}
+${t(ctx, 'unit_price')} $${product.precio} USD
+${t(ctx, 'available_stock')} ${product.stock}
 
-🛒 <b>Cantidad seleccionada:</b> ${qty}
-💵 <b>Monto total a pagar:</b> $${totalAmount.toFixed(2)} USD
+${t(ctx, 'selected_qty')} ${qty}
+${t(ctx, 'total_amount')} $${totalAmount.toFixed(2)} USD
 ━━━━━━━━━━━━━━━━━━━━━━━
-<i>Selecciona la cantidad usando los botones ➖ y ➕:</i>`;
+${t(ctx, 'select_qty_desc')}`;
 
       const buttons = [
           [
@@ -303,8 +328,8 @@ export function setupUserRoutes(bot: Telegraf<any>) {
               Markup.button.callback(`✅ ${qty}`, 'ignore'), 
               Markup.button.callback('➕', `checkout_${product.id}_${qty + 1}`)
           ],
-          [Markup.button.callback(`🛒 CONFIRMAR COMPRA (x${qty})`, `confirm_buy_${product.id}_${qty}`)],
-          [Markup.button.callback('🔙 Volver al catálogo', 'user_catalog')]
+          [Markup.button.callback(`${t(ctx, 'btn_confirm_buy')} (x${qty})`, `confirm_buy_${product.id}_${qty}`)],
+          [Markup.button.callback(t(ctx, 'btn_back_catalog'), 'user_catalog')]
       ];
 
       try {
@@ -349,11 +374,13 @@ export function setupUserRoutes(bot: Telegraf<any>) {
       const userBalance = parseFloat(user.saldo);
 
       if (userBalance < totalPrice) {
-        return ctx.telegram.editMessageText(ctx.chat?.id, processingMsg.message_id, undefined, `❌ *Saldo insuficiente*\n\nMonto a pagar: $${totalPrice.toFixed(2)} USD\nTu saldo: $${userBalance.toFixed(2)} USD\n\nPor favor, recarga saldo usando el botón de abajo.`, { 
+        let errStr = t(ctx, 'err_insufficient_funds');
+        errStr = errStr.replace('${total}', totalPrice.toFixed(2)).replace('${balance}', userBalance.toFixed(2));
+        return ctx.telegram.editMessageText(ctx.chat?.id, processingMsg.message_id, undefined, errStr, { 
             parse_mode: 'Markdown',
             reply_markup: Markup.inlineKeyboard([
-                [Markup.button.callback('💳 Recargar Saldo', 'user_recharge')],
-                [Markup.button.callback('🔙 Volver al catálogo', 'user_catalog')]
+                [Markup.button.callback(t(ctx, 'btn_recharge'), 'user_recharge')],
+                [Markup.button.callback(t(ctx, 'btn_back_catalog'), 'user_catalog')]
             ]).reply_markup
         });
       }
@@ -365,8 +392,8 @@ export function setupUserRoutes(bot: Telegraf<any>) {
           const { data: inventarioItems } = await supabase.from('inventario_cuentas').select('*').eq('id_producto', product.id).eq('vendido', false).order('fecha_agregado', { ascending: true }).limit(qty);
               
           if (!inventarioItems || inventarioItems.length < qty) {
-              return ctx.telegram.editMessageText(ctx.chat?.id, processingMsg.message_id, undefined, '❌ Error: Inconsistencia de inventario. No hay suficientes cuentas disponibles.', {
-                  reply_markup: Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al catálogo', 'user_catalog')]]).reply_markup
+              return ctx.telegram.editMessageText(ctx.chat?.id, processingMsg.message_id, undefined, t(ctx, 'err_inventory_mismatch'), {
+                  reply_markup: Markup.inlineKeyboard([[Markup.button.callback(t(ctx, 'btn_back_catalog'), 'user_catalog')]]).reply_markup
               });
           }
           
@@ -408,19 +435,19 @@ export function setupUserRoutes(bot: Telegraf<any>) {
           descripcion: `Compra x${qty}: ${product.nombre}`
       }]);
 
-      let mensajeExito = `✅ *¡COMPRA EXITOSA!*\n\n`;
-      mensajeExito += `🧾 *ID de Orden:* #${orderId}\n`;
-      mensajeExito += `🛍️ *Producto:* ${product.nombre} (x${qty})\n`;
-      mensajeExito += `💵 *Monto pagado:* $${totalPrice.toFixed(2)} USD\n`;
-      mensajeExito += `💼 *Saldo restante:* $${newBalance.toFixed(2)} USD\n\n`;
+      let mensajeExito = `${t(ctx, 'buy_success')}`;
+      mensajeExito += `${t(ctx, 'order_id')} #${orderId}\n`;
+      mensajeExito += `${t(ctx, 'product_label')} ${product.nombre} (x${qty})\n`;
+      mensajeExito += `${t(ctx, 'amount_paid')} $${totalPrice.toFixed(2)} USD\n`;
+      mensajeExito += `${t(ctx, 'balance_remaining')} $${newBalance.toFixed(2)} USD\n\n`;
       
       if (product.tipo_entrega === 'automatica') {
-          mensajeExito += `🎁 *Aquí tienes tus productos:*\n\n`;
+          mensajeExito += `${t(ctx, 'auto_delivery_title')}`;
           mensajeExito += `\`\`\`text\n${itemsEntregados}\n\`\`\`\n\n`;
-          mensajeExito += `¡Gracias por tu compra!`;
+          mensajeExito += `${t(ctx, 'thanks_for_buying')}`;
       } else {
-          mensajeExito += `⏳ *Entrega Manual:* Un administrador ha sido notificado y se comunicará contigo en breve para entregarte los productos.\n\n`;
-          mensajeExito += `¡Gracias por tu compra!`;
+          mensajeExito += `${t(ctx, 'manual_delivery_title')}`;
+          mensajeExito += `${t(ctx, 'thanks_for_buying')}`;
 
           // --- NOTIFICAR A LOS ADMINS SOBRE LA COMPRA MANUAL ---
           try {
@@ -450,15 +477,15 @@ export function setupUserRoutes(bot: Telegraf<any>) {
       }
 
       let keyboardButtons: any[] = [
-          [Markup.button.callback('🛍️ Seguir comprando', 'user_catalog')],
-          [Markup.button.callback('🔙 Menú principal', 'user_back')]
+          [Markup.button.callback(t(ctx, 'btn_continue_buying'), 'user_catalog')],
+          [Markup.button.callback(t(ctx, 'btn_back_menu'), 'user_back')]
       ];
 
       if (product.tipo_entrega !== 'automatica') {
           const supportUrl = await getSupportUrl();
-          const prefilledText = encodeURIComponent(`Hola, acabo de comprar el producto ${product.nombre} (Orden #${orderId}). Escribo para coordinar la entrega manual.`);
+          const prefilledText = encodeURIComponent(`${t(ctx, 'admin_notified')} ${product.nombre} (#${orderId})`);
           const fullSupportUrl = `${supportUrl}?text=${prefilledText}`;
-          keyboardButtons.unshift([Markup.button.url('📞 Hablar con el Vendedor', fullSupportUrl)]);
+          keyboardButtons.unshift([Markup.button.url(t(ctx, 'btn_talk_seller'), fullSupportUrl)]);
       }
 
       await ctx.telegram.editMessageText(ctx.chat?.id, processingMsg.message_id, undefined, mensajeExito, { 

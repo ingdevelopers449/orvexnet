@@ -1,5 +1,6 @@
 import { Scenes, Markup } from 'telegraf';
 import { supabase } from '../config/supabase';
+import { t } from '../locales/i18n';
 import { BinancePayService } from '../services/binance';
 
 const binanceService = new BinancePayService();
@@ -24,29 +25,14 @@ export const rechargeScene = new Scenes.WizardScene(
       if (nameRow && nameRow.valor) binanceName = nameRow.valor;
     }
 
-    const instrucciones = `💰 *Deposito Binance Pay*
-
-*Pay ID:* \`${payId}\`
-*Nombre Binance:* \`${binanceName}\`
-
-✅ Envia el monto exacto en USDT al Pay ID de arriba.
-✅ Copia tu Binance Order ID.
-✅ Pega tu Binance Order ID aqui.
-
-⚠️ *Solo se acreditaran pagos confirmados enviados a este Binance Pay ID.*
-
-🎁 *Bonus:*
-
-$50+ ➔ +2%
-$100+ ➔ +5%
-
-*Envia tu Binance Order ID abajo:*`;
+    let instrucciones = t(ctx, 'recharge_binance_title');
+    instrucciones = instrucciones.replace('{payId}', payId).replace('{binanceName}', binanceName);
 
     await ctx.reply(instrucciones, {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
-        [Markup.button.callback('🆔 ¿Dónde encuentro el Order ID?', 'help_order_id')],
-        [Markup.button.callback('❌ Cancelar', 'cancel_recharge')]
+        [Markup.button.callback(t(ctx, 'recharge_help_btn'), 'help_order_id')],
+        [Markup.button.callback(t(ctx, 'recharge_cancel'), 'cancel_recharge')]
       ])
     });
 
@@ -59,15 +45,15 @@ $100+ ➔ +5%
     if (ctx.callbackQuery && 'data' in ctx.callbackQuery) {
       // @ts-ignore
       if (ctx.callbackQuery.data === 'cancel_recharge') {
-        await ctx.answerCbQuery('Cancelado');
+        await ctx.answerCbQuery(t(ctx, 'btn_cancel').replace('❌ ', ''));
         await ctx.editMessageReplyMarkup(undefined);
-        await ctx.reply('Recarga cancelada.', removeKeyboard);
+        await ctx.reply(t(ctx, 'recharge_cancelled'), removeKeyboard);
         return ctx.scene.leave();
       }
       // @ts-ignore
       if (ctx.callbackQuery.data === 'help_order_id') {
         await ctx.answerCbQuery();
-        await ctx.reply('El Order ID es una serie de números que Binance te muestra en el recibo de tu pago exitoso (ej. 1234567890123456). Copia y pega solo los números aquí.');
+        await ctx.reply(t(ctx, 'recharge_help_msg'), { parse_mode: 'Markdown' });
         return; // No avanzamos, nos quedamos esperando el texto
       }
     }
@@ -157,17 +143,15 @@ $100+ ➔ +5%
             descripcion: `Recarga Binance TX: ${txId} (+Bonus: ${bonusPercent*100}%)`
         }]);
 
-        let successMsg = `✅ *¡RECARGA CONFIRMADA EXITOSAMENTE!*\n\n`;
-        successMsg += `🧾 *Order ID:* \`${txId}\`\n`;
-        successMsg += `💰 *Monto depositado:* ${amountPaid.toFixed(2)} USD\n`;
+        let successMsg = t(ctx, 'recharge_success').replace('{txId}', txId).replace('${amountPaid}', amountPaid.toFixed(2));
         
         if (bonusPercent > 0) {
-            successMsg += `🎁 *Bonus aplicado:* +${bonusPercent*100}% (+${bonusAmount.toFixed(2)} USD)\n`;
+            successMsg += t(ctx, 'recharge_bonus').replace('{bonusPercent}', (bonusPercent*100).toString()).replace('${bonusAmount}', bonusAmount.toFixed(2));
         }
         
-        successMsg += `💵 *Total acreditado:* $${totalUsdt.toFixed(2)} USD\n`;
-        successMsg += `💼 *Tu nuevo saldo es:* $${newBalance.toFixed(2)} USD\n\n`;
-        successMsg += `🎉 ¡Gracias por confiar en nosotros!`;
+        let successTotal = t(ctx, 'recharge_success_total');
+        successTotal = successTotal.replace('${totalUsdt}', totalUsdt.toFixed(2)).replace('${newBalance}', newBalance.toFixed(2));
+        successMsg += successTotal;
 
         await ctx.telegram.editMessageText(ctx.chat?.id, loadingMsg.message_id, undefined, successMsg, { parse_mode: 'Markdown' });
 
@@ -183,11 +167,11 @@ $100+ ➔ +5%
         }]);
 
         if (insertError && insertError.code === '23505') {
-            await ctx.telegram.editMessageText(ctx.chat?.id, loadingMsg.message_id, undefined, '❌ Error: Este Order ID ya ha sido registrado previamente.');
+            await ctx.telegram.editMessageText(ctx.chat?.id, loadingMsg.message_id, undefined, t(ctx, 'recharge_used_id'));
             return ctx.scene.leave();
         }
 
-        await ctx.telegram.editMessageText(ctx.chat?.id, loadingMsg.message_id, undefined, '⚠️ *Atención*\n\nNo pudimos verificar tu pago automáticamente en este momento. La recarga ha quedado en estado *pendiente*.\n\nUn administrador revisará este Order ID manualmente a la brevedad.', { parse_mode: 'Markdown' });
+        await ctx.telegram.editMessageText(ctx.chat?.id, loadingMsg.message_id, undefined, t(ctx, 'recharge_pending'), { parse_mode: 'Markdown' });
       }
 
       return ctx.scene.leave();
