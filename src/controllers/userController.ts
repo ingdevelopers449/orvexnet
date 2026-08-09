@@ -65,6 +65,7 @@ export async function renderCatalogList(ctx: any, page: number = 0) {
     try {
         await ctx.editMessageText(message, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
     } catch (e) {
+        await ctx.deleteMessage().catch(() => {});
         await ctx.reply(message, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
     }
 }
@@ -125,6 +126,7 @@ ${t(ctx, 'select_option')}
         await ctx.reply('🔥');
         await ctx.reply(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
     } catch (e) {
+        await ctx.deleteMessage().catch(() => {});
         await ctx.reply(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
     }
   }
@@ -147,7 +149,12 @@ ${t(ctx, 'select_option')}
       [Markup.button.url(t(ctx, 'btn_support'), supportUrl)]
     ]);
 
-    await ctx.editMessageText(welcomeMessage, { parse_mode: 'HTML', ...keyboard }).catch(() => {});
+    try {
+        await ctx.editMessageText(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
+    } catch (e) {
+        await ctx.deleteMessage().catch(() => {});
+        await ctx.reply(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
+    }
   });
 
   bot.action('user_catalog', async (ctx) => {
@@ -183,8 +190,21 @@ ${t(ctx, 'unit_price')} $${product.precio} USD
       ];
 
       try {
-          await ctx.editMessageText(message, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
-      } catch (e) {}
+          if (product.imagen_url) {
+              await ctx.deleteMessage().catch(() => {});
+              if (product.imagen_url.endsWith('.gif') || product.imagen_url.endsWith('.mp4')) {
+                  await ctx.replyWithAnimation(product.imagen_url, { caption: message, parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
+              } else {
+                  await ctx.replyWithPhoto(product.imagen_url, { caption: message, parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
+              }
+          } else {
+              await ctx.editMessageText(message, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
+          }
+      } catch (e) {
+          // Fallback en caso de que no pueda editar
+          await ctx.deleteMessage().catch(() => {});
+          await ctx.reply(message, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
+      }
   });
 
   bot.action('user_recharge', async (ctx) => {
@@ -303,8 +323,14 @@ ${t(ctx, 'profile_id')} <code>${ctx.from?.id}</code>
       
       const { data: product } = await supabase.from('productos').select('*').eq('id', productId).single();
       if (!product) return ctx.reply(t(ctx, 'err_product_not_found'));
-      if (!product.activo) return ctx.editMessageText(t(ctx, 'err_product_inactive'), { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback(t(ctx, 'btn_back_catalog'), 'user_catalog')]])});
-      if (product.stock <= 0) return ctx.editMessageText(t(ctx, 'err_out_of_stock'), { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback(t(ctx, 'btn_back_catalog'), 'user_catalog')]])});
+      if (!product.activo) {
+          await ctx.deleteMessage().catch(() => {});
+          return ctx.reply(t(ctx, 'err_product_inactive'), { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback(t(ctx, 'btn_back_catalog'), 'user_catalog')]])});
+      }
+      if (product.stock <= 0) {
+          await ctx.deleteMessage().catch(() => {});
+          return ctx.reply(t(ctx, 'err_out_of_stock'), { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback(t(ctx, 'btn_back_catalog'), 'user_catalog')]])});
+      }
 
       if (qty < 1) qty = 1;
       if (qty > product.stock) qty = product.stock;
@@ -333,8 +359,20 @@ ${t(ctx, 'select_qty_desc')}`;
       ];
 
       try {
-          await ctx.editMessageText(checkoutMsg, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
-      } catch (e) {}
+          if (product.imagen_url) {
+              await ctx.editMessageCaption(checkoutMsg, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
+          } else {
+              await ctx.editMessageText(checkoutMsg, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
+          }
+      } catch (e) {
+          // Si editMessageCaption falla (por ej, no era multimedia por algún error previo), intentamos fallback
+          try {
+              await ctx.editMessageText(checkoutMsg, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
+          } catch(err) {
+              await ctx.deleteMessage().catch(() => {});
+              await ctx.reply(checkoutMsg, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
+          }
+      }
   });
 
   bot.action('ignore', async (ctx) => {
@@ -349,6 +387,7 @@ ${t(ctx, 'select_qty_desc')}`;
     if (!telegramId) return ctx.answerCbQuery('Error: Usuario no identificado');
 
     await ctx.answerCbQuery('Procesando compra, por favor espera...');
+    await ctx.editMessageReplyMarkup(undefined).catch(() => {});
     const processingMsg = await ctx.reply('⏳ Procesando tu compra... verificando inventario y saldo.');
 
     try {

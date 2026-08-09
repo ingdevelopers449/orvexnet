@@ -34,7 +34,7 @@ export function setupAdminRoutes(bot: Telegraf<any>, notificationService: Notifi
         [Markup.button.callback('📢 Enviar Notificación Global', 'admin_notify')],
         [Markup.button.callback('📦 Agregar nuevo stock', 'admin_add_stock')],
         [Markup.button.callback('✏️ Editar producto', 'admin_edit_product'), Markup.button.callback('💰 Cambiar precio', 'admin_change_price')],
-        [Markup.button.callback('📝 Cambiar descripción', 'admin_change_desc')],
+        [Markup.button.callback('📝 Cambiar descripción', 'admin_change_desc'), Markup.button.callback('🖼️ Cambiar Imagen', 'admin_change_media')],
         [Markup.button.callback('🟢 Activar producto', 'admin_activate_prod'), Markup.button.callback('🔴 Desactivar producto', 'admin_deactivate_prod')],
         [Markup.button.callback('🗑️ Eliminar producto', 'admin_delete_prod'), Markup.button.callback('📊 Ver inventario', 'admin_view_inventory')],
         [Markup.button.callback('📢 Enviar anuncio', 'admin_send_announcement'), Markup.button.callback('👥 Ver usuarios', 'admin_view_users')],
@@ -111,7 +111,7 @@ export function setupAdminRoutes(bot: Telegraf<any>, notificationService: Notifi
     }
   });
 
-  bot.action(/admin_(edit_product|change_price|change_desc|activate_prod|deactivate_prod|delete_prod)/, adminMiddleware, async (ctx) => {
+  bot.action(/admin_(edit_product|change_price|change_desc|change_media|activate_prod|deactivate_prod|delete_prod)/, adminMiddleware, async (ctx) => {
     const action = ctx.match[1];
     await ctx.answerCbQuery();
     await ctx.scene.enter('EDIT_PRODUCT_SCENE', { editAction: action });

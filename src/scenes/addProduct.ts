@@ -178,7 +178,7 @@ export const addProductScene = new Scenes.WizardScene(
         data.stock = cuentas.length;
         data.contenido = 'Entrega desde inventario individual';
         
-        await ctx.reply(`✅ Detectadas ${cuentas.length} cuentas. Stock ajustado a ${cuentas.length}.\n\nEnvía una *imagen o fotografía* del producto (o presiona "Omitir"):`, {
+        await ctx.reply(`✅ Detectadas ${cuentas.length} cuentas. Stock ajustado a ${cuentas.length}.\n\nEnvía una *imagen, GIF* del producto o un enlace directo (URL). Si no quieres, presiona "Omitir":`, {
           parse_mode: 'Markdown',
           ...Markup.keyboard([['Omitir'], ['❌ Cancelar']]).resize()
         });
@@ -205,7 +205,7 @@ export const addProductScene = new Scenes.WizardScene(
         data.stock = stock;
         data.contenido = 'Entrega manual';
         
-        await ctx.reply('Envía una *imagen o fotografía* del producto (o escribe "Omitir"):', {
+        await ctx.reply('Envía una *imagen, GIF* del producto o un enlace directo (URL). Si no quieres, escribe "Omitir":', {
             parse_mode: 'Markdown',
             ...Markup.keyboard([['Omitir'], ['❌ Cancelar']]).resize()
         });
@@ -237,7 +237,7 @@ export const addProductScene = new Scenes.WizardScene(
       // @ts-ignore
       ctx.scene.session.productData.stock = stock;
       
-      await ctx.reply('Envía una *imagen o fotografía* del producto (o presiona "Omitir"):', {
+      await ctx.reply('Envía una *imagen, GIF* del producto o un enlace directo (URL). Si no quieres, presiona "Omitir":', {
         parse_mode: 'Markdown',
         ...Markup.keyboard([['Omitir'], ['❌ Cancelar']]).resize()
       });
@@ -249,19 +249,20 @@ export const addProductScene = new Scenes.WizardScene(
   async (ctx) => {
     // @ts-ignore
     if (ctx.message) {
-      // @ts-ignore
-      if (ctx.message.text === '❌ Cancelar') {
+      const msg = ctx.message as any;
+      if (msg.text === '❌ Cancelar') {
         await ctx.reply('Proceso cancelado.', removeKeyboard);
         return ctx.scene.leave();
       }
       
-      // @ts-ignore
       let imageId = null;
-      // @ts-ignore
-      if (ctx.message.photo) {
-        // @ts-ignore
-        const photos = ctx.message.photo;
+      if (msg.photo) {
+        const photos = msg.photo;
         imageId = photos[photos.length - 1].file_id; 
+      } else if (msg.animation) {
+        imageId = msg.animation.file_id;
+      } else if (msg.text && msg.text !== 'Omitir' && msg.text.startsWith('http')) {
+        imageId = msg.text.trim();
       }
       // @ts-ignore
       ctx.scene.session.productData.imagen_url = imageId;
@@ -284,11 +285,19 @@ Estado: 🟢 Activo`;
       ]);
 
       if (data.imagen_url) {
-        await ctx.replyWithPhoto(data.imagen_url, {
-          caption: previewText,
-          parse_mode: 'Markdown',
-          reply_markup: keyboard.reply_markup
-        });
+        if (data.imagen_url.endsWith('.gif') || data.imagen_url.endsWith('.mp4') || ((ctx.message as any) && (ctx.message as any).animation)) {
+             await ctx.replyWithAnimation(data.imagen_url, {
+                caption: previewText,
+                parse_mode: 'Markdown',
+                reply_markup: keyboard.reply_markup
+             });
+        } else {
+             await ctx.replyWithPhoto(data.imagen_url, {
+                caption: previewText,
+                parse_mode: 'Markdown',
+                reply_markup: keyboard.reply_markup
+             });
+        }
       } else {
         await ctx.reply(previewText, {
           parse_mode: 'Markdown',

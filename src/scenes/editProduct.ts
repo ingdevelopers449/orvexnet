@@ -24,6 +24,7 @@ export const editProductScene = new Scenes.WizardScene(
     if (action === 'edit_product') actionName = 'Cambiar Nombre';
     if (action === 'change_price') actionName = 'Cambiar Precio';
     if (action === 'change_desc') actionName = 'Cambiar Descripción';
+    if (action === 'change_media') actionName = 'Cambiar Imagen/GIF';
     if (action === 'activate_prod') actionName = 'Activar';
     if (action === 'deactivate_prod') actionName = 'Desactivar';
     if (action === 'delete_prod') actionName = 'Eliminar';
@@ -99,6 +100,8 @@ export const editProductScene = new Scenes.WizardScene(
           await ctx.editMessageText(`Escribe el <b>nuevo precio</b> para el producto (en USD):\n(Actual: $${product.precio})`, { parse_mode: 'HTML' });
         } else if (action === 'change_desc') {
           await ctx.editMessageText(`Escribe la <b>nueva descripción</b> para el producto:\n(Actual:\n${product.descripcion})`, { parse_mode: 'HTML' });
+        } else if (action === 'change_media') {
+          await ctx.editMessageText(`Envía la <b>nueva imagen, GIF o URL</b> para el producto:\n(O escribe "borrar" para quitarla)`, { parse_mode: 'HTML' });
         }
 
         // Mostrar teclado de cancelar para texto
@@ -114,9 +117,13 @@ export const editProductScene = new Scenes.WizardScene(
   // Paso 3: Recibir input de texto
   async (ctx) => {
     // @ts-ignore
-    if (ctx.message && 'text' in ctx.message) {
+    if (ctx.message) {
       // @ts-ignore
-      const text = ctx.message.text;
+      const text = ctx.message.text || '';
+      // @ts-ignore
+      const photo = ctx.message.photo;
+      // @ts-ignore
+      const animation = ctx.message.animation;
       
       if (text.toLowerCase() === 'cancelar' || text === '❌ Cancelar') {
         await ctx.reply('Operación cancelada.', removeKeyboard);
@@ -144,6 +151,23 @@ export const editProductScene = new Scenes.WizardScene(
       } else if (action === 'change_desc') {
         updateData = { descripcion: text };
         successMsg = `✅ Descripción actualizada.`;
+      } else if (action === 'change_media') {
+        if (text.toLowerCase() === 'borrar') {
+            updateData = { imagen_url: null };
+            successMsg = `✅ Imagen eliminada.`;
+        } else if (photo) {
+            updateData = { imagen_url: photo[photo.length - 1].file_id };
+            successMsg = `✅ Imagen actualizada.`;
+        } else if (animation) {
+            updateData = { imagen_url: animation.file_id };
+            successMsg = `✅ GIF animado actualizado.`;
+        } else if (text.startsWith('http')) {
+            updateData = { imagen_url: text.trim() };
+            successMsg = `✅ URL de imagen actualizada.`;
+        } else {
+            await ctx.reply('⚠️ Formato no válido. Envía una imagen, un GIF, un enlace o escribe "borrar".');
+            return;
+        }
       }
 
       const { error } = await supabase.from('productos').update(updateData).eq('id', productId);
