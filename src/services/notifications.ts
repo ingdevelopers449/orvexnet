@@ -39,11 +39,26 @@ export class NotificationService {
       const promises = batch.map(async (user) => {
         try {
           if (photoUrl) {
-            await this.bot.telegram.sendPhoto(user.id_telegram, photoUrl, {
-              caption: messageText,
-              parse_mode: 'HTML',
-              reply_markup: replyMarkup
-            });
+            try {
+                await this.bot.telegram.sendPhoto(user.id_telegram, photoUrl, {
+                  caption: messageText,
+                  parse_mode: 'HTML',
+                  reply_markup: replyMarkup
+                });
+            } catch (photoErr: any) {
+                try {
+                    await this.bot.telegram.sendAnimation(user.id_telegram, photoUrl, {
+                      caption: messageText,
+                      parse_mode: 'HTML',
+                      reply_markup: replyMarkup
+                    });
+                } catch (animErr: any) {
+                    await this.bot.telegram.sendMessage(user.id_telegram, messageText, {
+                      parse_mode: 'HTML',
+                      reply_markup: replyMarkup
+                    });
+                }
+            }
           } else {
             await this.bot.telegram.sendMessage(user.id_telegram, messageText, {
               parse_mode: 'HTML',
@@ -57,6 +72,7 @@ export class NotificationService {
             // El usuario bloqueó al bot, lo marcamos en la DB
             await supabase.from('usuarios').update({ bloqueado: true }).eq('id', user.id);
           }
+          console.error(`Error enviando notificación a ${user.id_telegram}:`, err);
           failCount++;
         }
       });
@@ -74,10 +90,18 @@ export class NotificationService {
       const { data: configRow } = await supabase.from('configuracion_bot').select('valor').eq('clave', 'canal_telegram').single();
       const canal = configRow?.valor;
       if (canal) {
-        const channelId = canal.startsWith('@') ? canal : `@${canal}`;
-        // Enviar sin botones al canal para evitar errores de edición de mensaje público
+        const channelId = canal.startsWith('-') || canal.startsWith('@') ? canal : `@${canal}`;
+        // Enviar al canal tratando foto, animacion y luego texto plano
         if (photoUrl) {
-           await this.bot.telegram.sendPhoto(channelId, photoUrl, { caption: messageText, parse_mode: 'HTML' });
+           try {
+               await this.bot.telegram.sendPhoto(channelId, photoUrl, { caption: messageText, parse_mode: 'HTML' });
+           } catch (photoErr) {
+               try {
+                   await this.bot.telegram.sendAnimation(channelId, photoUrl, { caption: messageText, parse_mode: 'HTML' });
+               } catch (animErr) {
+                   await this.bot.telegram.sendMessage(channelId, messageText, { parse_mode: 'HTML' });
+               }
+           }
         } else {
            await this.bot.telegram.sendMessage(channelId, messageText, { parse_mode: 'HTML' });
         }
@@ -91,15 +115,14 @@ export class NotificationService {
 
   // Genera el diseño premium idéntico al solicitado
   private formatPremiumMessage(product: any) {
-      return `🔥 HOT!
+      return `🛍️ <b>NUEVO INGRESO — STOCK LIMITADO</b> 👑
 
-✨ <b>${product.nombre} NEW STOCK</b>
+🌐 <b>${product.nombre}</b>
 
-🔥 Available: ${product.stock}
-💸 Price: From $${product.precio} USDT
+🚪 <b>Precio de venta:</b> <code>$${product.precio} USD</code>
+📦 <b>Disponibles:</b> <code>${product.stock}</code>
 
-❖ Buy now:
-@${this.bot.botInfo?.username || 'ORVEXNET_BOT'}`;
+🔔 <i>¡Apresúrate antes de que se agote!</i>`;
   }
 
   async sendNewProductNotification(productId: string) {
@@ -109,7 +132,7 @@ export class NotificationService {
     const message = this.formatPremiumMessage(product);
 
     const markup = Markup.inlineKeyboard([
-      Markup.button.callback('🛒 Buy Now', `view_product_${product.id}`)
+      Markup.button.callback(`🌐 Comprar ${product.nombre}`, `view_product_${product.id}`)
     ]).reply_markup;
 
     return this.broadcastToAll(message, markup, product.imagen_url);
@@ -122,7 +145,7 @@ export class NotificationService {
     const message = this.formatPremiumMessage(product);
 
     const markup = Markup.inlineKeyboard([
-      Markup.button.callback(`🛒 Buy Now`, `view_product_${product.id}`)
+      Markup.button.callback(`🌐 Comprar ${product.nombre}`, `view_product_${product.id}`)
     ]).reply_markup;
 
     return this.broadcastToAll(message, markup, product.imagen_url);

@@ -1,6 +1,7 @@
 import { Telegraf, Markup, Context } from 'telegraf';
 import { supabase } from '../config/supabase';
 import { t } from '../locales/i18n';
+import { config } from '../config/env';
 
 // Helper: Soporte URL
 export async function getSupportUrl() {
@@ -41,15 +42,14 @@ export async function renderCatalogList(ctx: any, page: number = 0) {
     
     const balance = await getUserBalance(ctx);
 
-    let message = `${t(ctx, 'catalog_title')}\n`;
-    message += `${t(ctx, 'balance_label')} $${balance} USD\n`;
-    message += `━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    message += `${t(ctx, 'catalog_desc')}\n\n`;
+    let message = `👑 <b>Tienda</b>\n\n`;
+    message += `<i>Elige un producto o una 📁 categoría 👇</i>\n`;
+    message += `═══════════════════════\n`;
 
     const buttons = [];
 
     for (const p of currentProducts) {
-        buttons.push([Markup.button.callback(`💎 ${p.nombre} - $${p.precio} USD | ${t(ctx, 'stock_label')}: ${p.stock}`, `view_product_${p.id}`)]);
+        buttons.push([Markup.button.callback(`⚡ ${p.nombre} — $${p.precio} | 🟢 ${p.stock}`, `view_product_${p.id}`)]);
     }
 
     if (totalPages > 1) {
@@ -60,7 +60,7 @@ export async function renderCatalogList(ctx: any, page: number = 0) {
         ]);
     }
 
-    buttons.push([Markup.button.callback(t(ctx, 'btn_back_menu'), 'user_back')]);
+    buttons.push([Markup.button.callback('🔙 ' + t(ctx, 'btn_back_menu'), 'user_back')]);
 
     try {
         await ctx.editMessageText(message, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
@@ -92,6 +92,9 @@ export function setupUserRoutes(bot: Telegraf<any>) {
   bot.action('set_lang_es', async (ctx) => {
       if (!ctx.session) ctx.session = {};
       ctx.session.language = 'es';
+      if (ctx.from) {
+          await supabase.from('usuarios').update({ idioma: 'es' }).eq('id_telegram', ctx.from.id);
+      }
       await ctx.deleteMessage().catch(() => {});
       await sendMainMenu(ctx);
   });
@@ -99,32 +102,59 @@ export function setupUserRoutes(bot: Telegraf<any>) {
   bot.action('set_lang_en', async (ctx) => {
       if (!ctx.session) ctx.session = {};
       ctx.session.language = 'en';
+      if (ctx.from) {
+          await supabase.from('usuarios').update({ idioma: 'en' }).eq('id_telegram', ctx.from.id);
+      }
       await ctx.deleteMessage().catch(() => {});
       await sendMainMenu(ctx);
   });
 
+  bot.action('user_language', async (ctx) => {
+      await ctx.answerCbQuery();
+      const langKeyboard = Markup.inlineKeyboard([
+          [Markup.button.callback('🇪🇸 Español', 'set_lang_es')],
+          [Markup.button.callback('🇺🇸 English', 'set_lang_en')]
+      ]);
+      await ctx.editMessageText('🌍 Please select your language / Por favor selecciona tu idioma:', langKeyboard).catch(() => {});
+  });
+
   async function sendMainMenu(ctx: any) {
     const balance = await getUserBalance(ctx);
-    const welcomeMessage = `${t(ctx, 'welcome_title')}
-━━━━━━━━━━━━━━━━━━━━━━━
+    const welcomeMessage = `✨ <b>VIP DASHBOARD</b> ✨
+═══════════════════════
+👋 <i>${t(ctx, 'welcome_title')}</i>
 ${t(ctx, 'welcome_desc')}
 
-${t(ctx, 'balance_label')} $${balance} USD
+💳 <b>${t(ctx, 'balance_label')}</b> <code style="color: green">$${balance} USD</code>
 
-${t(ctx, 'select_option')}
-━━━━━━━━━━━━━━━━━━━━━━━`;
+⬇️ <i>${t(ctx, 'select_option')}</i>
+═══════════════════════`;
 
     const supportUrl = await getSupportUrl();
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback(t(ctx, 'btn_catalog'), 'user_catalog')],
-      [Markup.button.callback(t(ctx, 'btn_recharge'), 'user_recharge'), Markup.button.callback(t(ctx, 'btn_profile'), 'user_profile')],
-      [Markup.button.url(t(ctx, 'btn_support'), supportUrl)]
+      [Markup.button.callback('🎯 ' + t(ctx, 'btn_catalog'), 'user_catalog')],
+      [Markup.button.callback('💰 ' + t(ctx, 'btn_recharge'), 'user_recharge'), Markup.button.callback('⚡ ' + t(ctx, 'btn_profile'), 'user_profile')],
+      [Markup.button.url('🔔 ' + t(ctx, 'btn_support'), supportUrl), Markup.button.callback('🧾 ' + t(ctx, 'history_title'), 'user_history')],
+      [Markup.button.callback('🌐 ' + t(ctx, 'btn_language'), 'user_language')]
     ]);
 
+    const banner = config.telegram.bannerUrl;
+
     try {
-        await ctx.reply('🔥');
-        await ctx.reply(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
+        if (banner) {
+            try {
+                await ctx.replyWithPhoto(banner, { caption: welcomeMessage, parse_mode: 'HTML', ...keyboard });
+            } catch (pErr) {
+                try {
+                    await ctx.replyWithAnimation(banner, { caption: welcomeMessage, parse_mode: 'HTML', ...keyboard });
+                } catch (aErr) {
+                    await ctx.reply(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
+                }
+            }
+        } else {
+            await ctx.reply(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
+        }
     } catch (e) {
         await ctx.deleteMessage().catch(() => {});
         await ctx.reply(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
@@ -134,23 +164,40 @@ ${t(ctx, 'select_option')}
   bot.action('user_back', async (ctx) => {
     await ctx.answerCbQuery();
     const balance = await getUserBalance(ctx);
-    const welcomeMessage = `${t(ctx, 'welcome_title')}
-━━━━━━━━━━━━━━━━━━━━━━━
+    const welcomeMessage = `✨ <b>VIP DASHBOARD</b> ✨
+═══════════════════════
+👋 <i>${t(ctx, 'welcome_title')}</i>
 ${t(ctx, 'welcome_desc')}
 
-${t(ctx, 'balance_label')} $${balance} USD
+💳 <b>${t(ctx, 'balance_label')}</b> <code style="color: green">$${balance} USD</code>
 
-${t(ctx, 'select_option')}
-━━━━━━━━━━━━━━━━━━━━━━━`;
+⬇️ <i>${t(ctx, 'select_option')}</i>
+═══════════════════════`;
     const supportUrl = await getSupportUrl();
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback(t(ctx, 'btn_catalog'), 'user_catalog')],
-      [Markup.button.callback(t(ctx, 'btn_recharge'), 'user_recharge'), Markup.button.callback(t(ctx, 'btn_profile'), 'user_profile')],
-      [Markup.button.url(t(ctx, 'btn_support'), supportUrl)]
+      [Markup.button.callback('🎯 ' + t(ctx, 'btn_catalog'), 'user_catalog')],
+      [Markup.button.callback('💰 ' + t(ctx, 'btn_recharge'), 'user_recharge'), Markup.button.callback('⚡ ' + t(ctx, 'btn_profile'), 'user_profile')],
+      [Markup.button.url('🔔 ' + t(ctx, 'btn_support'), supportUrl), Markup.button.callback('🧾 ' + t(ctx, 'history_title'), 'user_history')],
+      [Markup.button.callback('🌐 ' + t(ctx, 'btn_language'), 'user_language')]
     ]);
 
+    const banner = config.telegram.bannerUrl;
+
     try {
-        await ctx.editMessageText(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
+        if (banner) {
+            await ctx.deleteMessage().catch(() => {});
+            try {
+                await ctx.replyWithPhoto(banner, { caption: welcomeMessage, parse_mode: 'HTML', ...keyboard });
+            } catch (pErr) {
+                try {
+                    await ctx.replyWithAnimation(banner, { caption: welcomeMessage, parse_mode: 'HTML', ...keyboard });
+                } catch (aErr) {
+                    await ctx.reply(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
+                }
+            }
+        } else {
+            await ctx.editMessageText(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
+        }
     } catch (e) {
         await ctx.deleteMessage().catch(() => {});
         await ctx.reply(welcomeMessage, { parse_mode: 'HTML', ...keyboard });
@@ -174,19 +221,19 @@ ${t(ctx, 'select_option')}
       const { data: product } = await supabase.from('productos').select('*').eq('id', productId).single();
       if (!product) return ctx.reply(t(ctx, 'err_product_not_found'));
 
-      const message = `🛍️ <b>DETALLES DEL PRODUCTO</b>
-━━━━━━━━━━━━━━━━━━━━━━━
+      const message = `✨ <b>INFO DEL PRODUCTO</b> ✨
+═══════════════════════
 💎 <b>${product.nombre}</b>
 
-📜 <i>${product.descripcion || 'Sin descripción detallada.'}</i>
+<blockquote><i>${product.descripcion || 'Sin descripción detallada.'}</i></blockquote>
 
-${t(ctx, 'available_stock')} ${product.stock}
-${t(ctx, 'unit_price')} $${product.precio} USD
-━━━━━━━━━━━━━━━━━━━━━━━`;
+📦 <b>${t(ctx, 'available_stock')}</b> <code>${product.stock}</code>
+💵 <b>${t(ctx, 'unit_price')}</b> <code style="color: green">$${product.precio} USD</code>
+═══════════════════════`;
 
       const buttons = [
-          [Markup.button.callback(`🛒 Seleccionar cantidad`, `checkout_${product.id}_1`)],
-          [Markup.button.callback(t(ctx, 'btn_back_catalog'), 'user_catalog')]
+          [Markup.button.callback(`🛒 Seleccionar Cantidad`, `checkout_${product.id}_1`)],
+          [Markup.button.callback('🔙 ' + t(ctx, 'btn_back_catalog'), 'user_catalog')]
       ];
 
       try {
@@ -225,23 +272,24 @@ ${t(ctx, 'unit_price')} $${product.precio} USD
     const saldo = user.saldo;
     const { count } = await supabase.from('compras').select('*', { count: 'exact', head: true }).eq('id_usuario', user.id);
 
-    const profileText = `${t(ctx, 'profile_title')}
-━━━━━━━━━━━━━━━━━━━━━━━
-${t(ctx, 'profile_id')} <code>${ctx.from?.id}</code>
-📅 <b>Usuario desde:</b> ${new Date(user.fecha_registro).toLocaleDateString()}
-🛍️ <b>Compras realizadas:</b> ${count || 0}
+    const profileText = `👤 <b>PANEL VIP DEL CLIENTE</b> 👤
+═══════════════════════
+🆔 <b>${t(ctx, 'profile_id')}</b> <code>${ctx.from?.id}</code>
+📅 <b>Membro desde:</b> <i>${new Date(user.fecha_registro).toLocaleDateString()}</i>
+🏆 <b>Nivel:</b> ${count && count > 5 ? '👑 Cliente Frecuente' : '⭐ Cliente Estándar'}
 
-💰 <b>SALDO ACTUAL:</b>
-💎 <b>$${saldo} USD</b>
-━━━━━━━━━━━━━━━━━━━━━━━
-<i>Recuerda recargar tu saldo para comprar de manera automática.</i>`;
+💰 <b>SALDO DISPONIBLE:</b>
+💳 <b><code style="color: green">$${saldo} USD</code></b>
+
+🛍️ <b>Total de Compras:</b> ${count || 0}
+═══════════════════════
+💡 <i>Mantén tu saldo recargado para comprar sin esperas.</i>`;
 
     await ctx.editMessageText(profileText, {
       parse_mode: 'HTML',
       ...Markup.inlineKeyboard([
-          [Markup.button.callback(t(ctx, 'btn_recharge'), 'user_recharge')],
-          [Markup.button.callback(t(ctx, 'btn_history'), 'user_history')],
-          [Markup.button.callback(t(ctx, 'btn_back_menu'), 'user_back')]
+          [Markup.button.callback('💎 ' + t(ctx, 'btn_recharge'), 'user_recharge'), Markup.button.callback('🧾 ' + t(ctx, 'btn_history'), 'user_history')],
+          [Markup.button.callback('🔙 ' + t(ctx, 'btn_back_menu'), 'user_back')]
       ])
     });
   });
@@ -340,17 +388,17 @@ ${t(ctx, 'profile_id')} <code>${ctx.from?.id}</code>
       if (qty > product.stock) qty = product.stock;
 
       const totalAmount = product.precio * qty;
-      const checkoutMsg = `${t(ctx, 'checkout_title')}
-━━━━━━━━━━━━━━━━━━━━━━━
+      const checkoutMsg = `🛒 <b>CARRITO DE COMPRAS</b> 🛒
+═══════════════════════
 💎 <b>${product.nombre}</b>
 
-${t(ctx, 'unit_price')} $${product.precio} USD
-${t(ctx, 'available_stock')} ${product.stock}
+💵 <b>${t(ctx, 'unit_price')}</b> <code style="color: green">$${product.precio} USD</code>
+📦 <b>${t(ctx, 'available_stock')}</b> <code>${product.stock}</code>
+═══════════════════════
+📊 <b>${t(ctx, 'selected_qty')}</b> <code>${qty}</code>
+💰 <b>${t(ctx, 'total_amount')}</b> <code style="color: green">$${totalAmount.toFixed(2)} USD</code>
 
-${t(ctx, 'selected_qty')} ${qty}
-${t(ctx, 'total_amount')} $${totalAmount.toFixed(2)} USD
-━━━━━━━━━━━━━━━━━━━━━━━
-${t(ctx, 'select_qty_desc')}`;
+<i>${t(ctx, 'select_qty_desc')}</i>`;
 
       const buttons = [
           [
@@ -478,19 +526,21 @@ ${t(ctx, 'select_qty_desc')}`;
           descripcion: `Compra x${qty}: ${product.nombre}`
       }]);
 
-      let mensajeExito = `${t(ctx, 'buy_success')}`;
-      mensajeExito += `${t(ctx, 'order_id')} #${orderId}\n`;
-      mensajeExito += `${t(ctx, 'product_label')} ${product.nombre} (x${qty})\n`;
-      mensajeExito += `${t(ctx, 'amount_paid')} $${totalPrice.toFixed(2)} USD\n`;
-      mensajeExito += `${t(ctx, 'balance_remaining')} $${newBalance.toFixed(2)} USD\n\n`;
+      let mensajeExito = `✅ <b>${t(ctx, 'buy_success')}</b> ✅
+═══════════════════════
+🧾 <b>${t(ctx, 'order_id')}</b> <code>#${orderId}</code>
+🛍️ <b>${t(ctx, 'product_label')}</b> ${product.nombre} (x${qty})
+💰 <b>${t(ctx, 'amount_paid')}</b> <code style="color: green">$${totalPrice.toFixed(2)} USD</code>
+💳 <b>${t(ctx, 'balance_remaining')}</b> <code style="color: green">$${newBalance.toFixed(2)} USD</code>
+═══════════════════════\n`;
       
       if (product.tipo_entrega === 'automatica') {
-          mensajeExito += `${t(ctx, 'auto_delivery_title')}`;
-          mensajeExito += `\`\`\`text\n${itemsEntregados}\n\`\`\`\n\n`;
-          mensajeExito += `${t(ctx, 'thanks_for_buying')}`;
+          mensajeExito += `📥 <b>${t(ctx, 'auto_delivery_title')}</b>\n`;
+          mensajeExito += `<blockquote>${itemsEntregados}</blockquote>\n\n`;
+          mensajeExito += `<i>${t(ctx, 'thanks_for_buying')}</i>`;
       } else {
-          mensajeExito += `${t(ctx, 'manual_delivery_title')}`;
-          mensajeExito += `${t(ctx, 'thanks_for_buying')}`;
+          mensajeExito += `⏳ <b>${t(ctx, 'manual_delivery_title')}</b>\n`;
+          mensajeExito += `<i>${t(ctx, 'thanks_for_buying')}</i>`;
 
           // --- NOTIFICAR A LOS ADMINS SOBRE LA COMPRA MANUAL ---
           try {
@@ -498,17 +548,19 @@ ${t(ctx, 'select_qty_desc')}`;
               if (admins && admins.length > 0) {
                   const username = ctx.from?.username ? `@${ctx.from.username}` : `Sin @ (Nombre: ${ctx.from?.first_name})`;
                   const userId = ctx.from?.id;
-                  const adminMsg = `🚨 <b>NUEVA VENTA (ENTREGA MANUAL)</b> 🚨
-━━━━━━━━━━━━━━━━━━━━━━━
-🛍️ <b>Producto:</b> ${product.nombre} (x${qty})
-💰 <b>Total pagado:</b> $${totalPrice.toFixed(2)} USD
-🧾 <b>ID Orden:</b> #${orderId}
+                  const adminMsg = `
+🔔 <b>¡NUEVA VENTA MANUAL!</b> 🔔
+═══════════════════════
+🛒 <b>Producto:</b> <code>${product.nombre} (x${qty})</code>
+💵 <b>Ingreso:</b> <code style="color: green">+$${totalPrice.toFixed(2)} USD</code>
+🧾 <b>Orden:</b> <code>#${orderId}</code>
+═══════════════════════
+👤 <b>Comprador:</b> ${username}
+🆔 <b>ID:</b> <code>${userId}</code>
+🔗 <b>Chat Directo:</b> <a href="tg://user?id=${userId}">👉 Iniciar Chat 👈</a>
 
-👤 <b>Cliente:</b> ${username}
-🆔 <b>ID Telegram:</b> <code>${userId}</code>
-🔗 <b>Enlace Directo:</b> <a href="tg://user?id=${userId}">Toca aquí para chatear con el cliente</a>
-
-⚠️ <i>Contacta al cliente para hacerle la entrega manual.</i>`;
+⚠️ <b>ACCIÓN REQUERIDA:</b> <i>Entrega el producto a la brevedad.</i>
+`;
 
                   for (const admin of admins) {
                       await ctx.telegram.sendMessage(admin.id_telegram, adminMsg, { parse_mode: 'HTML' }).catch(() => {});
@@ -520,8 +572,8 @@ ${t(ctx, 'select_qty_desc')}`;
       }
 
       let keyboardButtons: any[] = [
-          [Markup.button.callback(t(ctx, 'btn_continue_buying'), 'user_catalog')],
-          [Markup.button.callback(t(ctx, 'btn_back_menu'), 'user_back')]
+          [Markup.button.callback('🛍️ ' + t(ctx, 'btn_continue_buying'), 'user_catalog')],
+          [Markup.button.callback('🔙 ' + t(ctx, 'btn_back_menu'), 'user_back')]
       ];
 
       if (product.tipo_entrega !== 'automatica') {

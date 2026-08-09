@@ -64,7 +64,7 @@ bot.use(async (ctx, next) => {
 
     if (!canal) return next();
 
-    const channelId = canal.startsWith('@') ? canal : `@${canal}`;
+    const channelId = canal.startsWith('-') || canal.startsWith('@') ? canal : `@${canal}`;
     const member = await ctx.telegram.getChatMember(channelId, ctx.from.id);
     const isMember = ['member', 'administrator', 'creator'].includes(member.status);
     
@@ -112,6 +112,21 @@ bot.use(async (ctx, next) => {
 // Configuración de Sesiones y Escenas
 const localSession = new LocalSession({ database: 'session_db.json' });
 bot.use(localSession.middleware());
+
+// Middleware para cargar idioma desde la base de datos
+bot.use(async (ctx: any, next) => {
+  if (ctx.from && !ctx.from.is_bot) {
+    if (ctx.session && !ctx.session.language) {
+      try {
+        const { data } = await supabase.from('usuarios').select('idioma').eq('id_telegram', ctx.from.id).single();
+        if (data && data.idioma) {
+          ctx.session.language = data.idioma;
+        }
+      } catch (err) {}
+    }
+  }
+  return next();
+});
 
 // El stage central (Añadiremos ANNOUNCEMENT_SCENE y BLOCK_USER_SCENE después)
 const stage = new Scenes.Stage<any>([

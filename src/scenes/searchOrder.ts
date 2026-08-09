@@ -17,23 +17,26 @@ searchOrderScene.on('text', async (ctx) => {
   
   if (queryId.startsWith('/')) return;
 
-  // Buscar en la tabla compras usando ilike para coincidir con el inicio del UUID
-  const { data: compras, error } = await supabase
-    .from('compras')
-    .select(`
-        *,
-        usuarios ( id_telegram, id ),
-        productos ( nombre, tipo_entrega, contenido )
-    `)
-    .ilike('id', `${queryId}%`);
-
-  if (error || !compras || compras.length === 0) {
-    await ctx.reply(`❌ No se encontró ninguna orden que coincida con el ID: <b>${queryId}</b>.`, { parse_mode: 'HTML' });
-    return ctx.scene.leave();
+  // Buscar en la tabla compras. Si es UUID completo usamos eq, si es corto leemos todos (o los recientes) y filtramos
+  let compras = [];
+  if (queryId.length === 36 && queryId.includes('-')) {
+      const { data } = await supabase.from('compras').select('*, usuarios(id_telegram, id), productos(nombre, tipo_entrega, contenido)').eq('id', queryId);
+      if (data) compras = data;
+  } else {
+      const { data: allIds } = await supabase.from('compras').select('id');
+      const matched = allIds?.filter(c => c.id.toUpperCase().startsWith(queryId.toUpperCase()));
+      if (matched && matched.length > 0) {
+          if (matched.length > 1) {
+              await ctx.reply(`⚠️ Se encontraron ${matched.length} coincidencias. Por favor, ingresa un ID más completo (más de 8 caracteres).`);
+              return ctx.scene.leave();
+          }
+          const { data } = await supabase.from('compras').select('*, usuarios(id_telegram, id), productos(nombre, tipo_entrega, contenido)').eq('id', matched[0].id);
+          if (data) compras = data;
+      }
   }
 
-  if (compras.length > 1) {
-    await ctx.reply(`⚠️ Se encontraron ${compras.length} coincidencias. Por favor, ingresa un ID más completo (más de 8 caracteres).`);
+  if (!compras || compras.length === 0) {
+    await ctx.reply(`❌ No se encontró ninguna orden que coincida con el ID: <b>${queryId}</b>.`, { parse_mode: 'HTML' });
     return ctx.scene.leave();
   }
 

@@ -4,6 +4,7 @@ dotenv.config();
 export const config = {
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
+    bannerUrl: process.env.BANNER_URL || '',
   },
   supabase: {
     url: (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, ''),
