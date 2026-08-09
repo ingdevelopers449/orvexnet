@@ -285,18 +285,25 @@ Estado: 🟢 Activo`;
       ]);
 
       if (data.imagen_url) {
-        if (data.imagen_url.endsWith('.gif') || data.imagen_url.endsWith('.mp4') || ((ctx.message as any) && (ctx.message as any).animation)) {
-             await ctx.replyWithAnimation(data.imagen_url, {
-                caption: previewText,
-                parse_mode: 'Markdown',
-                reply_markup: keyboard.reply_markup
-             });
-        } else {
+        try {
              await ctx.replyWithPhoto(data.imagen_url, {
                 caption: previewText,
                 parse_mode: 'Markdown',
                 reply_markup: keyboard.reply_markup
              });
+        } catch (errPhoto) {
+             try {
+                 await ctx.replyWithAnimation(data.imagen_url, {
+                    caption: previewText,
+                    parse_mode: 'Markdown',
+                    reply_markup: keyboard.reply_markup
+                 });
+             } catch (errAnim) {
+                 await ctx.reply(previewText, {
+                    parse_mode: 'Markdown',
+                    reply_markup: keyboard.reply_markup
+                 });
+             }
         }
       } else {
         await ctx.reply(previewText, {

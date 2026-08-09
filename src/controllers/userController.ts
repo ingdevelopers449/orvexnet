@@ -192,10 +192,14 @@ ${t(ctx, 'unit_price')} $${product.precio} USD
       try {
           if (product.imagen_url) {
               await ctx.deleteMessage().catch(() => {});
-              if (product.imagen_url.endsWith('.gif') || product.imagen_url.endsWith('.mp4')) {
-                  await ctx.replyWithAnimation(product.imagen_url, { caption: message, parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
-              } else {
+              try {
                   await ctx.replyWithPhoto(product.imagen_url, { caption: message, parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
+              } catch (errPhoto) {
+                  try {
+                      await ctx.replyWithAnimation(product.imagen_url, { caption: message, parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
+                  } catch (errAnim) {
+                      await ctx.reply(message, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
+                  }
               }
           } else {
               await ctx.editMessageText(message, { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) });
