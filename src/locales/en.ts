@@ -4,10 +4,11 @@ export const en = {
     welcome_desc: "🚀 <i>The best digital products platform.</i>\n\n🔹 <b>Automatic Delivery</b> ⚡️\n🔹 <b>Premium Support</b> 🛡️\n🔹 <b>Unbeatable Prices</b> 💎",
     balance_label: "💰 <b>Your current balance:</b>",
     select_option: "👇 <b>Select an option to begin:</b>",
-    btn_catalog: "🛒 VIEW PRODUCT CATALOG",
-    btn_recharge: "💳 Add Balance",
-    btn_profile: "👤 My Profile",
-    btn_support: "📞 Contact Support",
+    btn_catalog: "🎯 VIEW PRODUCT CATALOG",
+    btn_recharge: "💰 Add Balance",
+    btn_profile: "⚡ My Profile",
+    btn_support: "🔔 Contact Support",
+    btn_language: "🌐 Change Language",
 
     // Catalog
     catalog_title: "🛍️ <b>PRODUCT CATALOG</b>",

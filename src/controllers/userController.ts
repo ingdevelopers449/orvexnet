@@ -133,10 +133,10 @@ ${t(ctx, 'welcome_desc')}
     const supportUrl = await getSupportUrl();
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('🎯 ' + t(ctx, 'btn_catalog'), 'user_catalog')],
-      [Markup.button.callback('💰 ' + t(ctx, 'btn_recharge'), 'user_recharge'), Markup.button.callback('⚡ ' + t(ctx, 'btn_profile'), 'user_profile')],
-      [Markup.button.url('🔔 ' + t(ctx, 'btn_support'), supportUrl), Markup.button.callback('🧾 ' + t(ctx, 'history_title'), 'user_history')],
-      [Markup.button.callback('🌐 ' + t(ctx, 'btn_language'), 'user_language')]
+      [Markup.button.callback(t(ctx, 'btn_catalog'), 'user_catalog')],
+      [Markup.button.callback(t(ctx, 'btn_recharge'), 'user_recharge'), Markup.button.callback(t(ctx, 'btn_profile'), 'user_profile')],
+      [Markup.button.url(t(ctx, 'btn_support'), supportUrl), Markup.button.callback(t(ctx, 'btn_history'), 'user_history')],
+      [Markup.button.callback(t(ctx, 'btn_language'), 'user_language')]
     ]);
 
     const banner = config.telegram.bannerUrl;
@@ -175,10 +175,10 @@ ${t(ctx, 'welcome_desc')}
 ═══════════════════════`;
     const supportUrl = await getSupportUrl();
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('🎯 ' + t(ctx, 'btn_catalog'), 'user_catalog')],
-      [Markup.button.callback('💰 ' + t(ctx, 'btn_recharge'), 'user_recharge'), Markup.button.callback('⚡ ' + t(ctx, 'btn_profile'), 'user_profile')],
-      [Markup.button.url('🔔 ' + t(ctx, 'btn_support'), supportUrl), Markup.button.callback('🧾 ' + t(ctx, 'history_title'), 'user_history')],
-      [Markup.button.callback('🌐 ' + t(ctx, 'btn_language'), 'user_language')]
+      [Markup.button.callback(t(ctx, 'btn_catalog'), 'user_catalog')],
+      [Markup.button.callback(t(ctx, 'btn_recharge'), 'user_recharge'), Markup.button.callback(t(ctx, 'btn_profile'), 'user_profile')],
+      [Markup.button.url(t(ctx, 'btn_support'), supportUrl), Markup.button.callback(t(ctx, 'btn_history'), 'user_history')],
+      [Markup.button.callback(t(ctx, 'btn_language'), 'user_language')]
     ]);
 
     const banner = config.telegram.bannerUrl;
