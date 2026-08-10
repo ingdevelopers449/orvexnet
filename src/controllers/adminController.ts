@@ -190,7 +190,9 @@ export function setupAdminRoutes(bot: Telegraf<any>, notificationService: Notifi
       }
       
       let msg = `📋 <b>ÓRDENES PENDIENTES DE ENTREGA (${pendientes.length})</b>\n━━━━━━━━━━━━━━━━━━━━━━━\n`;
-      msg += `<i>Copia el ID y usa el buscador de órdenes para entregar.</i>\n\n`;
+      msg += `<i>Toca el botón correspondiente abajo para marcar como entregado.</i>\n\n`;
+
+      let buttons = [];
 
       pendientes.forEach(c => {
           // @ts-ignore
@@ -203,9 +205,14 @@ export function setupAdminRoutes(bot: Telegraf<any>, notificationService: Notifi
           msg += `🛍️ <b>Item:</b> ${prodName} (x${c.cantidad})\n`;
           msg += `👤 <b>Cliente:</b> ${username}\n`;
           msg += `━━━━━━━━━━━━━━━━━━━━━━━\n`;
+          
+          buttons.push([Markup.button.callback(`✅ Entregar ${shortId}`, `mark_delivered_${c.id}`)]);
       });
 
-      await ctx.reply(msg, { parse_mode: 'HTML' });
+      await ctx.reply(msg, { 
+          parse_mode: 'HTML',
+          ...Markup.inlineKeyboard(buttons)
+      });
   });
 
   // Revisar últimas recargas
@@ -267,12 +274,12 @@ export function setupAdminRoutes(bot: Telegraf<any>, notificationService: Notifi
           return ctx.reply('❌ Error al actualizar el estado de la orden.');
       }
       
-      if (ctx.callbackQuery.message && 'text' in ctx.callbackQuery.message) {
-          const newText = ctx.callbackQuery.message.text.replace('Estado: pendiente', 'Estado: entregada').replace('Estado: pagada', 'Estado: entregada');
-          await ctx.editMessageText(newText, { parse_mode: 'HTML' }).catch(() => {});
-      } else {
-          await ctx.reply('✅ Orden marcada como entregada.');
+      // Removemos el botón (teclado) del mensaje original para que no lo puedan volver a presionar
+      if (ctx.callbackQuery.message) {
+          await ctx.editMessageReplyMarkup(undefined).catch(() => {});
       }
+      
+      await ctx.reply(`✅ La orden <code>${orderId.substring(0,8).toUpperCase()}</code> ha sido marcada como entregada.`, { parse_mode: 'HTML' });
   });
 
   bot.action(/admin_.+/, adminMiddleware, async (ctx) => {

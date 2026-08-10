@@ -563,7 +563,12 @@ ${t(ctx, 'welcome_desc')}
 `;
 
                   for (const admin of admins) {
-                      await ctx.telegram.sendMessage(admin.id_telegram, adminMsg, { parse_mode: 'HTML' }).catch(() => {});
+                      await ctx.telegram.sendMessage(admin.id_telegram, adminMsg, { 
+                          parse_mode: 'HTML',
+                          ...Markup.inlineKeyboard([
+                              [Markup.button.callback('✅ Marcar como Entregado', `mark_delivered_${compraRes?.id}`)]
+                          ])
+                      }).catch(() => {});
                   }
               }
           } catch (err) {
