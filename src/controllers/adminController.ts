@@ -40,7 +40,7 @@ export function setupAdminRoutes(bot: Telegraf<any>, notificationService: Notifi
         [Markup.button.callback('📢 Enviar anuncio', 'admin_send_announcement'), Markup.button.callback('👥 Ver usuarios', 'admin_view_users')],
         [Markup.button.callback('💳 Revisar recargas', 'admin_review_recharges'), Markup.button.callback('🔎 Consultar Saldo', 'admin_check_balance')],
         [Markup.button.callback('🧾 Ver compras', 'admin_view_purchases'), Markup.button.callback('📈 Ver estadísticas', 'admin_view_stats')],
-        [Markup.button.callback('🚫 Bloquear usuario', 'admin_block_user')],
+        [Markup.button.callback('📋 Órdenes Pendientes', 'admin_pending_orders'), Markup.button.callback('🚫 Bloquear usuario', 'admin_block_user')],
         [Markup.button.callback('🔙 Cerrar Panel', 'admin_back')]
       ])
     });
@@ -175,7 +175,34 @@ export function setupAdminRoutes(bot: Telegraf<any>, notificationService: Notifi
           msg += `👤 ID: <code>${c.usuarios?.id_telegram}</code>\n`;
           // @ts-ignore
           msg += `🛍️ Producto: ${c.productos?.nombre} (x${c.cantidad})\n`;
-          msg += `💰 Pagó: $${c.precio_pagado}\n\n`;
+          msg += `💰 Pagó: $${c.precio_pagado} | Estado: ${c.estado}\n\n`;
+      });
+
+      await ctx.reply(msg, { parse_mode: 'HTML' });
+  });
+
+  bot.action('admin_pending_orders', adminMiddleware, async (ctx) => {
+      await ctx.answerCbQuery('Cargando órdenes pendientes...');
+      const { data: pendientes } = await supabase.from('compras').select('*, usuarios(id_telegram, nombre_usuario), productos(nombre)').eq('estado', 'pendiente').order('fecha_compra', { ascending: true }).limit(20);
+      
+      if (!pendientes || pendientes.length === 0) {
+          return ctx.reply('✅ No hay órdenes pendientes de entrega manual.');
+      }
+      
+      let msg = `📋 <b>ÓRDENES PENDIENTES DE ENTREGA (${pendientes.length})</b>\n━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      msg += `<i>Copia el ID y usa el buscador de órdenes para entregar.</i>\n\n`;
+
+      pendientes.forEach(c => {
+          // @ts-ignore
+          const username = c.usuarios?.nombre_usuario ? `@${c.usuarios.nombre_usuario}` : `ID: ${c.usuarios?.id_telegram}`;
+          // @ts-ignore
+          const prodName = c.productos?.nombre;
+          const shortId = c.id.substring(0, 8).toUpperCase();
+          
+          msg += `🧾 <b>ID:</b> <code>${shortId}</code>\n`;
+          msg += `🛍️ <b>Item:</b> ${prodName} (x${c.cantidad})\n`;
+          msg += `👤 <b>Cliente:</b> ${username}\n`;
+          msg += `━━━━━━━━━━━━━━━━━━━━━━━\n`;
       });
 
       await ctx.reply(msg, { parse_mode: 'HTML' });
