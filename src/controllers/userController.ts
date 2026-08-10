@@ -77,6 +77,21 @@ export function setupUserRoutes(bot: Telegraf<any>) {
   });
 
   bot.start(async (ctx) => {
+    // Check for deep linking payload
+    // @ts-ignore
+    const payload = ctx.message?.text?.split(' ')[1];
+    if (payload && payload.startsWith('reply_')) {
+        const orderId = payload.replace('reply_', '');
+        if (ctx.from) {
+            const { data: admin } = await supabase.from('administradores').select('id').eq('id_telegram', ctx.from.id).eq('activo', true).single();
+            if (admin) {
+                if (!ctx.session) ctx.session = {};
+                ctx.session.replyOrderId = orderId;
+                return ctx.scene.enter('REPLY_USER_SCENE');
+            }
+        }
+    }
+
     if (!ctx.session) ctx.session = {};
     if (!ctx.session.language) {
         // Mostrar menú de idioma
@@ -542,13 +557,15 @@ ${t(ctx, 'welcome_desc')}
           mensajeExito += `⏳ <b>${t(ctx, 'manual_delivery_title')}</b>\n`;
           mensajeExito += `<i>${t(ctx, 'thanks_for_buying')}</i>`;
 
-          // --- NOTIFICAR A LOS ADMINS SOBRE LA COMPRA MANUAL ---
+          // --- NOTIFICAR SOBRE LA COMPRA MANUAL ---
           try {
+              const { data: configRow } = await supabase.from('configuracion_bot').select('valor').eq('clave', 'canal_ventas').single();
+              const canalVentas = configRow?.valor;
               const { data: admins } = await supabase.from('administradores').select('id_telegram').eq('activo', true);
-              if (admins && admins.length > 0) {
-                  const username = ctx.from?.username ? `@${ctx.from.username}` : `Sin @ (Nombre: ${ctx.from?.first_name})`;
-                  const userId = ctx.from?.id;
-                  const adminMsg = `
+              
+              const username = ctx.from?.username ? `@${ctx.from.username}` : `Sin @ (Nombre: ${ctx.from?.first_name})`;
+              const userId = ctx.from?.id;
+              const adminMsg = `
 🔔 <b>¡NUEVA VENTA MANUAL!</b> 🔔
 ═══════════════════════
 🛒 <b>Producto:</b> <code>${product.nombre} (x${qty})</code>
@@ -557,22 +574,33 @@ ${t(ctx, 'welcome_desc')}
 ═══════════════════════
 👤 <b>Comprador:</b> ${username}
 🆔 <b>ID:</b> <code>${userId}</code>
-🔗 <b>Chat Directo:</b> <a href="tg://user?id=${userId}">👉 Iniciar Chat 👈</a>
 
-⚠️ <b>ACCIÓN REQUERIDA:</b> <i>Entrega el producto a la brevedad.</i>
-`;
+⚠️ <b>ACCIÓN REQUERIDA:</b> <i>Entrega el producto a la brevedad.</i>`;
 
+              const keyboard = Markup.inlineKeyboard([
+                  [Markup.button.url('👤 Contactar Usuario', `tg://user?id=${userId}`)],
+                  [Markup.button.url('💬 Enviar Respuesta', `https://t.me/${ctx.botInfo.username}?start=reply_${compraRes?.id}`)],
+                  [Markup.button.callback('✅ Marcar como Entregado', `mark_delivered_${compraRes?.id}`)]
+              ]);
+
+              if (canalVentas) {
+                  // Enviar al canal de ventas
+                  const targetChannel = canalVentas.startsWith('-') || canalVentas.startsWith('@') ? canalVentas : `@${canalVentas}`;
+                  await ctx.telegram.sendMessage(targetChannel, adminMsg, { 
+                      parse_mode: 'HTML',
+                      ...keyboard
+                  }).catch(console.error);
+              } else if (admins && admins.length > 0) {
+                  // Si no hay canal, enviar a los admins por privado
                   for (const admin of admins) {
                       await ctx.telegram.sendMessage(admin.id_telegram, adminMsg, { 
                           parse_mode: 'HTML',
-                          ...Markup.inlineKeyboard([
-                              [Markup.button.callback('✅ Marcar como Entregado', `mark_delivered_${compraRes?.id}`)]
-                          ])
+                          ...keyboard
                       }).catch(() => {});
                   }
               }
           } catch (err) {
-              console.error('Error enviando alerta a admins:', err);
+              console.error('Error enviando alerta:', err);
           }
       }
 
