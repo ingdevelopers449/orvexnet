@@ -230,6 +230,24 @@ export function setupAdminRoutes(bot: Telegraf<any>, notificationService: Notifi
       await ctx.reply(msg, { parse_mode: 'HTML' });
   });
 
+  bot.action(/mark_delivered_(.+)/, adminMiddleware, async (ctx) => {
+      const orderId = ctx.match[1];
+      await ctx.answerCbQuery('Actualizando estado...');
+      
+      const { error } = await supabase.from('compras').update({ estado: 'entregada' }).eq('id', orderId);
+      
+      if (error) {
+          return ctx.reply('❌ Error al actualizar el estado de la orden.');
+      }
+      
+      if (ctx.callbackQuery.message && 'text' in ctx.callbackQuery.message) {
+          const newText = ctx.callbackQuery.message.text.replace('Estado: pendiente', 'Estado: entregada').replace('Estado: pagada', 'Estado: entregada');
+          await ctx.editMessageText(newText, { parse_mode: 'HTML' }).catch(() => {});
+      } else {
+          await ctx.reply('✅ Orden marcada como entregada.');
+      }
+  });
+
   bot.action(/admin_.+/, adminMiddleware, async (ctx) => {
     await ctx.answerCbQuery('Esta función aún no está implementada.');
   });

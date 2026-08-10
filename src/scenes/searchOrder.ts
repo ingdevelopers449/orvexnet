@@ -74,6 +74,14 @@ searchOrderScene.on('text', async (ctx) => {
       }
   }
 
-  await ctx.reply(msg, { parse_mode: 'HTML' });
+  let buttons = [];
+  if (compra.estado !== 'entregada') {
+      buttons.push([Markup.button.callback('✅ Marcar como Entregado', `mark_delivered_${compra.id}`)]);
+  }
+
+  await ctx.reply(msg, { 
+      parse_mode: 'HTML',
+      ...(buttons.length > 0 ? Markup.inlineKeyboard(buttons) : {})
+  });
   return ctx.scene.leave();
 });
