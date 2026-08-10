@@ -579,13 +579,13 @@ ${t(ctx, 'welcome_desc')}
 
               const keyboard = Markup.inlineKeyboard([
                   [Markup.button.url('👤 Contactar Usuario', `tg://user?id=${userId}`)],
-                  [Markup.button.url('💬 Enviar Respuesta', `https://t.me/${ctx.botInfo.username}?start=reply_${compraRes?.id}`)],
+                  [Markup.button.url('💬 Enviar Respuesta', `https://t.me/${ctx.botInfo?.username || 'bot'}?start=reply_${compraRes?.id}`)],
                   [Markup.button.callback('✅ Marcar como Entregado', `mark_delivered_${compraRes?.id}`)]
               ]);
 
               if (canalVentas) {
                   // Enviar al canal de ventas
-                  const targetChannel = canalVentas.startsWith('-') || canalVentas.startsWith('@') ? canalVentas : `@${canalVentas}`;
+                  const targetChannel = canalVentas.startsWith('-') ? parseInt(canalVentas, 10) : (canalVentas.startsWith('@') ? canalVentas : `@${canalVentas}`);
                   await ctx.telegram.sendMessage(targetChannel, adminMsg, { 
                       parse_mode: 'HTML',
                       ...keyboard
@@ -617,7 +617,7 @@ ${t(ctx, 'welcome_desc')}
       }
 
       await ctx.telegram.editMessageText(ctx.chat?.id, processingMsg.message_id, undefined, mensajeExito, { 
-          parse_mode: 'Markdown',
+          parse_mode: 'HTML',
           reply_markup: Markup.inlineKeyboard(keyboardButtons).reply_markup
       });
 
