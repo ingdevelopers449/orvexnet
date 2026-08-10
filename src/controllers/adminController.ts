@@ -38,7 +38,7 @@ export function setupAdminRoutes(bot: Telegraf<any>, notificationService: Notifi
         [Markup.button.callback('🟢 Activar producto', 'admin_activate_prod'), Markup.button.callback('🔴 Desactivar producto', 'admin_deactivate_prod')],
         [Markup.button.callback('🗑️ Eliminar producto', 'admin_delete_prod'), Markup.button.callback('📊 Ver inventario', 'admin_view_inventory')],
         [Markup.button.callback('📢 Enviar anuncio', 'admin_send_announcement'), Markup.button.callback('👥 Ver usuarios', 'admin_view_users')],
-        [Markup.button.callback('💳 Revisar recargas', 'admin_review_recharges')],
+        [Markup.button.callback('💳 Revisar recargas', 'admin_review_recharges'), Markup.button.callback('🔎 Consultar Saldo', 'admin_check_balance')],
         [Markup.button.callback('🧾 Ver compras', 'admin_view_purchases'), Markup.button.callback('📈 Ver estadísticas', 'admin_view_stats')],
         [Markup.button.callback('🚫 Bloquear usuario', 'admin_block_user')],
         [Markup.button.callback('🔙 Cerrar Panel', 'admin_back')]
@@ -210,6 +210,11 @@ export function setupAdminRoutes(bot: Telegraf<any>, notificationService: Notifi
   bot.action('admin_block_user', adminMiddleware, async (ctx) => {
       await ctx.answerCbQuery();
       await ctx.scene.enter('BLOCK_USER_SCENE');
+  });
+
+  bot.action('admin_check_balance', adminMiddleware, async (ctx) => {
+      await ctx.answerCbQuery();
+      await ctx.scene.enter('CHECK_BALANCE_SCENE');
   });
 
   bot.action('admin_view_users', adminMiddleware, async (ctx) => {

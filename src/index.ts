@@ -11,6 +11,7 @@ import { searchOrderScene } from './scenes/searchOrder';
 import { editProductScene } from './scenes/editProduct';
 import { announcementScene } from './scenes/announcement';
 import { blockUserScene } from './scenes/blockUser';
+import { checkBalanceScene } from './scenes/checkBalance';
 import { NotificationService } from './services/notifications';
 import { setupUserRoutes } from './controllers/userController';
 import { setupAdminRoutes } from './controllers/adminController';
@@ -137,7 +138,8 @@ const stage = new Scenes.Stage<any>([
   searchOrderScene, 
   editProductScene,
   announcementScene,
-  blockUserScene
+  blockUserScene,
+  checkBalanceScene
 ]);
 
 // Sistema de escape global
