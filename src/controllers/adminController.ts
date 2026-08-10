@@ -192,7 +192,7 @@ export function setupAdminRoutes(bot: Telegraf<any>, notificationService: Notifi
       let msg = `📋 <b>ÓRDENES PENDIENTES DE ENTREGA (${pendientes.length})</b>\n━━━━━━━━━━━━━━━━━━━━━━━\n`;
       msg += `<i>Toca el botón correspondiente abajo para marcar como entregado.</i>\n\n`;
 
-      let buttons = [];
+      let buttons: any[][] = [];
 
       pendientes.forEach(c => {
           // @ts-ignore
