@@ -236,19 +236,26 @@ ${t(ctx, 'welcome_desc')}
       const { data: product } = await supabase.from('productos').select('*').eq('id', productId).single();
       if (!product) return ctx.reply(t(ctx, 'err_product_not_found'));
 
-      const message = `✨ <b>INFO DEL PRODUCTO</b> ✨
-═══════════════════════
-💎 <b>${product.nombre}</b>
+      const entregaTxt = product.tipo_entrega === 'automatica' 
+          ? '⚡ Entrega automática instantánea' 
+          : '⏳ Entrega manual (soporte)';
 
-<blockquote><i>${product.descripcion || 'Sin descripción detallada.'}</i></blockquote>
+      const message = `✅ <b>Productos disponibles</b>
+✨ <b>${product.nombre}</b>
 
-📦 <b>${t(ctx, 'available_stock')}</b> <code>${product.stock}</code>
-💵 <b>${t(ctx, 'unit_price')}</b> <code style="color: green">$${product.precio} USD</code>
-═══════════════════════`;
+✅ <b>Producto oficial de la tienda</b>
+${entregaTxt}
+
+<blockquote>📝 <b>Descripción</b>\n${product.descripcion || 'Sin descripción detallada.'}\n\n📦 Stock: ${product.stock} unidades</blockquote>
+
+<blockquote>✨ <b>Siéntete libre de comprar en ORVEX SHOP</b>\n⚡ Servicio rápido, seguro y confiable</blockquote>
+
+<i>La entrega se realizará tras la confirmación del pago.</i>`;
 
       const buttons = [
-          [Markup.button.callback(`🛒 Seleccionar Cantidad`, `checkout_${product.id}_1`)],
-          [Markup.button.callback('🔙 ' + t(ctx, 'btn_back_catalog'), 'user_catalog')]
+          [Markup.button.callback(`🛒 COMPRAR | $${product.precio} | 🟢 ${product.stock}`, `checkout_${product.id}_1`)],
+          [Markup.button.callback(`🔄 Actualizar`, `view_product_${product.id}`)],
+          [Markup.button.callback(`❌ Volver a la tienda`, `user_catalog`)]
       ];
 
       try {
@@ -403,15 +410,11 @@ ${t(ctx, 'welcome_desc')}
       if (qty > product.stock) qty = product.stock;
 
       const totalAmount = product.precio * qty;
-      const checkoutMsg = `🛒 <b>CARRITO DE COMPRAS</b> 🛒
-═══════════════════════
-💎 <b>${product.nombre}</b>
+      const checkoutMsg = `✅ <b>Productos disponibles</b>
+✨ <b>${product.nombre}</b>
 
-💵 <b>${t(ctx, 'unit_price')}</b> <code style="color: green">$${product.precio} USD</code>
-📦 <b>${t(ctx, 'available_stock')}</b> <code>${product.stock}</code>
-═══════════════════════
-📊 <b>${t(ctx, 'selected_qty')}</b> <code>${qty}</code>
-💰 <b>${t(ctx, 'total_amount')}</b> <code style="color: green">$${totalAmount.toFixed(2)} USD</code>
+<blockquote>📊 <b>Cantidad seleccionada:</b> ${qty}
+💰 <b>Monto total a pagar:</b> <code style="color: green">$${totalAmount.toFixed(2)} USD</code></blockquote>
 
 <i>${t(ctx, 'select_qty_desc')}</i>`;
 
@@ -421,8 +424,8 @@ ${t(ctx, 'welcome_desc')}
               Markup.button.callback(`✅ ${qty}`, 'ignore'), 
               Markup.button.callback('➕', `checkout_${product.id}_${qty + 1}`)
           ],
-          [Markup.button.callback(`${t(ctx, 'btn_confirm_buy')} (x${qty})`, `confirm_buy_${product.id}_${qty}`)],
-          [Markup.button.callback(t(ctx, 'btn_back_catalog'), 'user_catalog')]
+          [Markup.button.callback(`🛒 CONFIRMAR COMPRA (x${qty})`, `confirm_buy_${product.id}_${qty}`)],
+          [Markup.button.callback(`❌ Volver a la tienda`, `user_catalog`)]
       ];
 
       try {
@@ -566,16 +569,17 @@ ${t(ctx, 'welcome_desc')}
               const username = ctx.from?.username ? `@${ctx.from.username}` : `Sin @ (Nombre: ${ctx.from?.first_name})`;
               const userId = ctx.from?.id;
               const adminMsg = `
-🔔 <b>¡NUEVA VENTA MANUAL!</b> 🔔
-═══════════════════════
-🛒 <b>Producto:</b> <code>${product.nombre} (x${qty})</code>
-💵 <b>Ingreso:</b> <code style="color: green">+$${totalPrice.toFixed(2)} USD</code>
-🧾 <b>Orden:</b> <code>#${orderId}</code>
-═══════════════════════
-👤 <b>Comprador:</b> ${username}
-🆔 <b>ID:</b> <code>${userId}</code>
+🚨 <b>ATENCIÓN: NUEVA VENTA MANUAL REQUERIDA</b> 🚨
 
-⚠️ <b>ACCIÓN REQUERIDA:</b> <i>Entrega el producto a la brevedad.</i>`;
+<blockquote>🛍️ <b>PRODUCTO A ENTREGAR:</b>
+<code>${product.nombre} (x${qty})</code></blockquote>
+
+<blockquote>💰 <b>INGRESO:</b> <code style="color: green">+$${totalPrice.toFixed(2)} USD</code>
+🧾 <b>ORDEN:</b> <code>#${orderId}</code>
+👤 <b>CLIENTE:</b> ${username}
+🆔 <b>ID:</b> <code>${userId}</code></blockquote>
+
+⚠️ <b>Por favor, atiende este pedido lo más pronto posible.</b>`;
 
               const keyboard = Markup.inlineKeyboard([
                   [Markup.button.url('👤 Contactar Usuario', `tg://user?id=${userId}`)],
