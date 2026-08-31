@@ -135,15 +135,16 @@ export function setupUserRoutes(bot: Telegraf<any>) {
 
   async function sendMainMenu(ctx: any) {
     const balance = await getUserBalance(ctx);
-    const welcomeMessage = `✨ <b>VIP DASHBOARD</b> ✨
-═══════════════════════
+    const welcomeMessage = `✨ <tg-emoji emoji-id="5368324170671202286">🔥</tg-emoji> <b>ORVEX PREMIUM DASHBOARD</b> <tg-emoji emoji-id="5368324170671202286">🔥</tg-emoji> ✨
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 👋 <i>${t(ctx, 'welcome_title')}</i>
 ${t(ctx, 'welcome_desc')}
 
-💳 <b>${t(ctx, 'balance_label')}</b> <code style="color: green">$${balance} USD</code>
+<blockquote>💳 <b>${t(ctx, 'balance_label')}</b>
+<code>$${balance} USD</code></blockquote>
 
 ⬇️ <i>${t(ctx, 'select_option')}</i>
-═══════════════════════`;
+━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
     const supportUrl = await getSupportUrl();
 
@@ -179,15 +180,16 @@ ${t(ctx, 'welcome_desc')}
   bot.action('user_back', async (ctx) => {
     await ctx.answerCbQuery();
     const balance = await getUserBalance(ctx);
-    const welcomeMessage = `✨ <b>VIP DASHBOARD</b> ✨
-═══════════════════════
+    const welcomeMessage = `✨ <tg-emoji emoji-id="5368324170671202286">🔥</tg-emoji> <b>ORVEX PREMIUM DASHBOARD</b> <tg-emoji emoji-id="5368324170671202286">🔥</tg-emoji> ✨
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 👋 <i>${t(ctx, 'welcome_title')}</i>
 ${t(ctx, 'welcome_desc')}
 
-💳 <b>${t(ctx, 'balance_label')}</b> <code style="color: green">$${balance} USD</code>
+<blockquote>💳 <b>${t(ctx, 'balance_label')}</b>
+<code>$${balance} USD</code></blockquote>
 
 ⬇️ <i>${t(ctx, 'select_option')}</i>
-═══════════════════════`;
+━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     const supportUrl = await getSupportUrl();
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.callback(t(ctx, 'btn_catalog'), 'user_catalog')],
@@ -410,11 +412,12 @@ ${entregaTxt}
       if (qty > product.stock) qty = product.stock;
 
       const totalAmount = product.precio * qty;
-      const checkoutMsg = `✅ <b>Productos disponibles</b>
-✨ <b>${product.nombre}</b>
+      const checkoutMsg = `🛒 <b>RESUMEN DE COMPRA</b>
+━━━━━━━━━━━━━━━━━━
+✨ <b>Producto:</b> <code>${product.nombre}</code>
 
-<blockquote>📊 <b>Cantidad seleccionada:</b> ${qty}
-💰 <b>Monto total a pagar:</b> <code style="color: green">$${totalAmount.toFixed(2)} USD</code></blockquote>
+<blockquote>📊 <b>Cantidad:</b> ${qty}
+💰 <b>Total a pagar:</b> <code>$${totalAmount.toFixed(2)} USD</code></blockquote>
 
 <i>${t(ctx, 'select_qty_desc')}</i>`;
 
@@ -545,12 +548,13 @@ ${entregaTxt}
       }]);
 
       let mensajeExito = `✅ <b>${t(ctx, 'buy_success')}</b> ✅
-═══════════════════════
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 🧾 <b>${t(ctx, 'order_id')}</b> <code>#${orderId}</code>
-🛍️ <b>${t(ctx, 'product_label')}</b> ${product.nombre} (x${qty})
-💰 <b>${t(ctx, 'amount_paid')}</b> <code style="color: green">$${totalPrice.toFixed(2)} USD</code>
-💳 <b>${t(ctx, 'balance_remaining')}</b> <code style="color: green">$${newBalance.toFixed(2)} USD</code>
-═══════════════════════\n`;
+🛍️ <b>${t(ctx, 'product_label')}</b> <code>${product.nombre} (x${qty})</code>
+
+<blockquote>💰 <b>${t(ctx, 'amount_paid')}</b> <code>$${totalPrice.toFixed(2)} USD</code>
+💳 <b>${t(ctx, 'balance_remaining')}</b> <code>$${newBalance.toFixed(2)} USD</code></blockquote>
+━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
       
       if (product.tipo_entrega === 'automatica') {
           mensajeExito += `📥 <b>${t(ctx, 'auto_delivery_title')}</b>\n`;

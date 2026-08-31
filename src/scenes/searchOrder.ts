@@ -75,8 +75,12 @@ searchOrderScene.on('text', async (ctx) => {
   }
 
   let buttons = [];
-  if (compra.estado !== 'entregada') {
+  if (compra.estado !== 'entregada' && compra.estado !== 'reembolsada' && compra.estado !== 'cancelada') {
       buttons.push([Markup.button.callback('✅ Marcar como Entregado', `mark_delivered_${compra.id}`)]);
+  }
+  
+  if (compra.estado !== 'reembolsada' && compra.estado !== 'cancelada') {
+      buttons.push([Markup.button.callback('🔄 Devolver / Reembolsar', `refund_order_${compra.id}`)]);
   }
 
   await ctx.reply(msg, { 

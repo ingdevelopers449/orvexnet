@@ -282,6 +282,82 @@ export function setupAdminRoutes(bot: Telegraf<any>, notificationService: Notifi
       await ctx.reply(`✅ La orden <code>${orderId.substring(0,8).toUpperCase()}</code> ha sido marcada como entregada.`, { parse_mode: 'HTML' });
   });
 
+  bot.action(/refund_order_(.+)/, adminMiddleware, async (ctx) => {
+      const orderId = ctx.match[1];
+      await ctx.answerCbQuery('Procesando reembolso...');
+      
+      const { data: compra, error: getError } = await supabase.from('compras').select('*, usuarios(id_telegram, saldo), productos(id, stock, tipo_entrega)').eq('id', orderId).single();
+      
+      if (getError || !compra) {
+          return ctx.reply('❌ Error: No se encontró la orden.');
+      }
+      if (compra.estado === 'reembolsada' || compra.estado === 'cancelada') {
+          return ctx.reply('⚠️ Esta orden ya ha sido reembolsada o cancelada.');
+      }
+
+      // 1. Marcar como reembolsada
+      const { error: updateError } = await supabase.from('compras').update({ estado: 'reembolsada' }).eq('id', orderId);
+      if (updateError) return ctx.reply('❌ Error al actualizar el estado de la orden.');
+
+      // 2. Devolver saldo al usuario
+      // @ts-ignore
+      const oldBalance = Number(compra.usuarios?.saldo || 0);
+      const newBalance = oldBalance + Number(compra.precio_pagado);
+      
+      await supabase.from('usuarios').update({ saldo: newBalance }).eq('id', compra.id_usuario);
+
+      // 3. Registrar movimiento
+      await supabase.from('movimientos_saldo').insert([{
+          id_usuario: compra.id_usuario,
+          tipo_movimiento: 'devolucion',
+          monto: compra.precio_pagado,
+          saldo_anterior: oldBalance,
+          saldo_nuevo: newBalance,
+          descripcion: `Devolución de orden #${orderId.substring(0, 8).toUpperCase()}`,
+          id_compra: orderId,
+          // @ts-ignore
+          id_administrador: ctx.from.id
+      }]);
+
+      // 4. Restaurar stock de producto
+      // @ts-ignore
+      const newStock = Number(compra.productos?.stock || 0) + Number(compra.cantidad);
+      await supabase.from('productos').update({ stock: newStock }).eq('id', compra.id_producto);
+
+      // 5. Desvincular de inventario_cuentas si era cuenta automática
+      // @ts-ignore
+      if (compra.productos?.tipo_entrega === 'automatica') {
+          const { data: cuentas } = await supabase.from('inventario_cuentas')
+              .select('id')
+              .eq('id_comprador', compra.id_usuario)
+              .eq('id_producto', compra.id_producto)
+              .order('fecha_vendido', { ascending: false })
+              .limit(compra.cantidad);
+              
+          if (cuentas && cuentas.length > 0) {
+              const ids = cuentas.map(c => c.id);
+              await supabase.from('inventario_cuentas')
+                  .update({ vendido: false, id_comprador: null, fecha_vendido: null })
+                  .in('id', ids);
+          }
+      }
+
+      // 6. Notificar al usuario
+      // @ts-ignore
+      const telegramId = compra.usuarios?.id_telegram;
+      if (telegramId) {
+          try {
+              await ctx.telegram.sendMessage(telegramId, `🔄 <b>DEVOLUCIÓN APROBADA</b>\n\nTu orden <code>#${orderId.substring(0,8).toUpperCase()}</code> ha sido reembolsada por un administrador.\n\n💰 Se ha devuelto <b>$${compra.precio_pagado} USD</b> a tu saldo.\n💳 <b>Nuevo saldo:</b> $${newBalance.toFixed(2)} USD`, { parse_mode: 'HTML' });
+          } catch(e) {}
+      }
+
+      // 7. Removemos teclado del admin y avisamos
+      if (ctx.callbackQuery.message) {
+          await ctx.editMessageReplyMarkup(undefined).catch(() => {});
+      }
+      await ctx.reply(`✅ La orden <code>${orderId.substring(0,8).toUpperCase()}</code> ha sido reembolsada correctamente.`, { parse_mode: 'HTML' });
+  });
+
   bot.action(/admin_.+/, adminMiddleware, async (ctx) => {
     await ctx.answerCbQuery('Esta función aún no está implementada.');
   });
