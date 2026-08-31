@@ -36,8 +36,9 @@ export function setupAdminRoutes(bot: Telegraf<any>, notificationService: Notifi
         [Markup.button.callback('✏️ Editar producto', 'admin_edit_product'), Markup.button.callback('💰 Cambiar precio', 'admin_change_price')],
         [Markup.button.callback('📝 Cambiar descripción', 'admin_change_desc'), Markup.button.callback('🖼️ Cambiar Imagen', 'admin_change_media')],
         [Markup.button.callback('🟢 Activar producto', 'admin_activate_prod'), Markup.button.callback('🔴 Desactivar producto', 'admin_deactivate_prod')],
-        [Markup.button.callback('🗑️ Eliminar producto', 'admin_delete_prod'), Markup.button.callback('📊 Ver inventario', 'admin_view_inventory')],
+        [Markup.button.callback('🗑️ Eliminar producto', 'admin_delete_prod'), Markup.button.callback('📋 Solicitar Datos (On/Off)', 'admin_change_req_data')],
         [Markup.button.callback('📢 Enviar anuncio', 'admin_send_announcement'), Markup.button.callback('👥 Ver usuarios', 'admin_view_users')],
+        [Markup.button.callback('📊 Ver inventario', 'admin_view_inventory'), Markup.button.callback('📈 Ver estadísticas', 'admin_view_stats')],
         [Markup.button.callback('💳 Revisar recargas', 'admin_review_recharges'), Markup.button.callback('🔎 Consultar Saldo', 'admin_check_balance')],
         [Markup.button.callback('🧾 Ver compras', 'admin_view_purchases'), Markup.button.callback('📈 Ver estadísticas', 'admin_view_stats')],
         [Markup.button.callback('📋 Órdenes Pendientes', 'admin_pending_orders'), Markup.button.callback('🚫 Bloquear usuario', 'admin_block_user')],
@@ -111,7 +112,7 @@ export function setupAdminRoutes(bot: Telegraf<any>, notificationService: Notifi
     }
   });
 
-  bot.action(/admin_(edit_product|change_price|change_desc|change_media|activate_prod|deactivate_prod|delete_prod)/, adminMiddleware, async (ctx) => {
+  bot.action(/admin_(edit_product|change_price|change_desc|change_media|change_req_data|activate_prod|deactivate_prod|delete_prod)/, adminMiddleware, async (ctx) => {
     const action = ctx.match[1];
     await ctx.answerCbQuery();
     await ctx.scene.enter('EDIT_PRODUCT_SCENE', { editAction: action });

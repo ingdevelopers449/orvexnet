@@ -25,6 +25,7 @@ export const editProductScene = new Scenes.WizardScene(
     if (action === 'change_price') actionName = 'Cambiar Precio';
     if (action === 'change_desc') actionName = 'Cambiar Descripción';
     if (action === 'change_media') actionName = 'Cambiar Imagen/GIF';
+    if (action === 'change_req_data') actionName = 'Solicitar Datos (On/Off)';
     if (action === 'activate_prod') actionName = 'Activar';
     if (action === 'deactivate_prod') actionName = 'Desactivar';
     if (action === 'delete_prod') actionName = 'Eliminar';
@@ -68,6 +69,13 @@ export const editProductScene = new Scenes.WizardScene(
         }
 
         // Acciones directas que no requieren input de texto
+        if (action === 'change_req_data') {
+          const newState = !product.requiere_datos;
+          await supabase.from('productos').update({ requiere_datos: newState }).eq('id', productId);
+          await ctx.editMessageText(`✅ El producto <b>${product.nombre}</b> ahora <b>${newState ? 'SÍ' : 'NO'}</b> requiere datos adicionales del cliente al comprar.`, { parse_mode: 'HTML' });
+          return ctx.scene.leave();
+        }
+        
         if (action === 'activate_prod') {
           await supabase.from('productos').update({ activo: true }).eq('id', productId);
           await ctx.editMessageText(`✅ El producto <b>${product.nombre}</b> ha sido activado.`, { parse_mode: 'HTML' });

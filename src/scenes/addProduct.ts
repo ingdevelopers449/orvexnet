@@ -281,6 +281,7 @@ Estado: 🟢 Activo`;
 
       const keyboard = Markup.inlineKeyboard([
         [Markup.button.callback('✅ Guardar producto', 'save_product')],
+        [Markup.button.callback(`📝 Solicitar Datos (Correo, etc): ${data.requiere_datos ? 'SÍ' : 'NO'}`, 'toggle_req_data')],
         [Markup.button.callback('✏️ Editar', 'edit_product'), Markup.button.callback('❌ Cancelar', 'cancel_product')]
       ]);
 
@@ -333,6 +334,20 @@ Estado: 🟢 Activo`;
         ctx.wizard.selectStep(0);
         // @ts-ignore
         return ctx.wizard.steps[0](ctx);
+      } else if (action === 'toggle_req_data') {
+        // @ts-ignore
+        const data = ctx.scene.session.productData;
+        data.requiere_datos = !data.requiere_datos;
+        await ctx.answerCbQuery('Opción actualizada');
+        
+        const keyboard = Markup.inlineKeyboard([
+          [Markup.button.callback('✅ Guardar producto', 'save_product')],
+          [Markup.button.callback(`📝 Solicitar Datos (Correo, etc): ${data.requiere_datos ? 'SÍ' : 'NO'}`, 'toggle_req_data')],
+          [Markup.button.callback('✏️ Editar', 'edit_product'), Markup.button.callback('❌ Cancelar', 'cancel_product')]
+        ]);
+        
+        await ctx.editMessageReplyMarkup(keyboard.reply_markup);
+        return;
       } else if (action === 'save_product') {
         await ctx.answerCbQuery('Guardando en DB...');
         // @ts-ignore
@@ -347,6 +362,7 @@ Estado: 🟢 Activo`;
             tipo_entrega: data.tipo_entrega,
             contenido: data.contenido,
             imagen_url: data.imagen_url,
+            requiere_datos: data.requiere_datos || false,
             activo: true
         }]).select().single();
 

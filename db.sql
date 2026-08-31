@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS productos (
 
     destacado BOOLEAN NOT NULL DEFAULT FALSE,
 
+    requiere_datos BOOLEAN NOT NULL DEFAULT FALSE,
+
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -130,6 +132,8 @@ CREATE TABLE IF NOT EXISTS compras (
     estado TEXT NOT NULL DEFAULT 'pendiente',
 
     contenido_entregado TEXT,
+
+    datos_usuario TEXT,
 
     fecha_compra TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 

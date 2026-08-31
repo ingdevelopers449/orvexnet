@@ -114,25 +114,23 @@ export class NotificationService {
   }
 
   // Genera el diseño premium idéntico al solicitado
-  private formatPremiumMessage(product: any) {
-      return `🛍️ <b>NUEVO INGRESO — STOCK LIMITADO</b> 👑
+  private formatPremiumMessage(product: any, titleSuffix: string = 'NUEVO STOCK') {
+      return `<tg-emoji emoji-id="5368324170671202286">🔥</tg-emoji> <b>HOT!</b>
 
-🌐 <b>${product.nombre}</b>
+📦 <b>${product.nombre} ${titleSuffix}</b>
 
-🚪 <b>Precio de venta:</b> <code>$${product.precio} USD</code>
-📦 <b>Disponibles:</b> <code>${product.stock}</code>
-
-🔔 <i>¡Apresúrate antes de que se agote!</i>`;
+<tg-emoji emoji-id="5368324170671202286">🔥</tg-emoji> Disponible: <b>${product.stock}</b>
+💰 Precio: Desde <b>$${product.precio} USDT</b>`;
   }
 
   async sendNewProductNotification(productId: string) {
     const { data: product } = await supabase.from('productos').select('*').eq('id', productId).single();
     if (!product) return;
 
-    const message = this.formatPremiumMessage(product);
+    const message = this.formatPremiumMessage(product, 'NUEVO PRODUCTO');
 
     const markup = Markup.inlineKeyboard([
-      Markup.button.callback(`🌐 Comprar ${product.nombre}`, `view_product_${product.id}`)
+      [Markup.button.callback(`📦 Comprar ${product.nombre}`, `view_product_${product.id}`)]
     ]).reply_markup;
 
     return this.broadcastToAll(message, markup, product.imagen_url);
@@ -142,10 +140,10 @@ export class NotificationService {
     const { data: product } = await supabase.from('productos').select('*').eq('id', productId).single();
     if (!product) return;
 
-    const message = this.formatPremiumMessage(product);
+    const message = this.formatPremiumMessage(product, 'NUEVO STOCK');
 
     const markup = Markup.inlineKeyboard([
-      Markup.button.callback(`🌐 Comprar ${product.nombre}`, `view_product_${product.id}`)
+      [Markup.button.callback(`📦 Comprar ${product.nombre}`, `view_product_${product.id}`)]
     ]).reply_markup;
 
     return this.broadcastToAll(message, markup, product.imagen_url);

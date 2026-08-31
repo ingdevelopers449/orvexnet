@@ -547,6 +547,36 @@ ${entregaTxt}
           descripcion: `Compra x${qty}: ${product.nombre}`
       }]);
 
+      if (product.requiere_datos) {
+          const username = ctx.from?.username ? `@${ctx.from.username}` : `Sin @ (Nombre: ${ctx.from?.first_name})`;
+          const adminMsg = `
+🚨 <b>ATENCIÓN: NUEVA VENTA REQUERIDA</b> 🚨
+
+<blockquote>🛍️ <b>PRODUCTO A ENTREGAR:</b>
+<code>${product.nombre} (x${qty})</code></blockquote>
+
+<blockquote>💰 <b>INGRESO:</b> <code>+$${totalPrice.toFixed(2)} USD</code>
+🧾 <b>ORDEN:</b> <code>#${orderId}</code>
+👤 <b>CLIENTE:</b> ${username}
+🆔 <b>ID:</b> <code>${ctx.from?.id}</code></blockquote>
+
+⚠️ <b>Por favor, atiende este pedido lo más pronto posible.</b>`;
+
+          await ctx.telegram.deleteMessage(ctx.chat!.id, processingMsg.message_id).catch(() => {});
+          
+          // @ts-ignore
+          return ctx.scene.enter('COLLECT_DATA_SCENE', {
+              orderId: compraRes?.id,
+              productName: product.nombre,
+              adminAlertMsg: adminMsg,
+              product,
+              qty,
+              totalPrice,
+              newBalance,
+              telegramId: ctx.from?.id
+          });
+      }
+
       let mensajeExito = `✅ <b>${t(ctx, 'buy_success')}</b> ✅
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🧾 <b>${t(ctx, 'order_id')}</b> <code>#${orderId}</code>
